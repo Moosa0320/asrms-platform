@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Final Exam Study Notes — Partial Derivatives</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #222; line-height: 1.45; margin: 24px; }
+    h1 { color: #1F4E79; }
+    h2 { color: #2E75B6; }
+    h3 { color: #C00000; }
+    .spacer { height: 16px; }
+    .color-box { border: 4px solid #1F4E79; background: #EBF3FB; padding: 16px; margin: 12px 0; }
+    .formula-box { border: 4px solid #ED7D31; background: #FFF2CC; padding: 16px; margin: 12px 0; }
+    .urdu-box { border: 4px solid #375623; background: #E2EFDA; padding: 16px; margin: 12px 0; }
+    .two-col { display: flex; gap: 16px; }
+    .two-col > div { flex: 1; padding: 12px; border: 1px solid #DDD; background: #F7F7F7; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    table th, table td { border: 1px solid #CCC; padding: 8px; text-align: center; }
+    .header { background: #1F4E79; color: #fff; font-weight: bold; }
+    .boxed { padding: 8px; background: #F2F2F2; }
+    .bullet { margin-left: 20px; }
+    .italic { font-style: italic; }
+    .center { text-align: center; }
+  </style>
+</head>
+<body>
+  <h1 class="center">FINAL EXAM STUDY NOTES</h1>
+  <p class="center"><strong>Functions of Several Variables & Partial Derivatives</strong></p>
+  <p class="center italic">Week 9 & Week 10 | Applied Calculus</p>
+
+  <h1>WEEK 9: FUNCTIONS OF SEVERAL VARIABLES</h1>
+
+  <h2>1. What is a Function of Several Variables?</h2>
+  <p>In single-variable calculus you had <strong>f(x)</strong> — one input, one output. Now we upgrade to <strong>f(x, y)</strong> — TWO inputs, one output.</p>
+
+  <div class="color-box">
+    <strong>FORMAL DEFINITION:</strong>
+    <p>A function <strong>z = f(x, y)</strong> maps each ordered pair (x, y) from a domain D in the real plane R<sup>2</sup> to a unique real number z.</p>
+    <p><strong>Domain:</strong> All valid input pairs (x, y)</p>
+    <p><strong>Range:</strong> All possible output values z</p>
+  </div>
+
+  <h3>Real-Life Analogy:</h3>
+  <p><strong>Pizza Cost:</strong> C = f(s, t) where s = size, t = toppings.</p>
+
+  <h2>2. Increasing & Decreasing Functions</h2>
+  <div class="color-box" style="background:#FFF0F0; border-color:#C00000;">
+    <strong>KEY RULE:</strong>
+    <ul>
+      <li>f is INCREASING in x: as x goes up, f goes up (while y stays fixed)</li>
+      <li>f is DECREASING in x: as x goes up, f goes down (while y stays fixed)</li>
+      <li>Test EACH variable separately — hold the other constant!</li>
+    </ul>
+  </div>
+
+  <h3>Solved Example — Airline Revenue</h3>
+  <div class="color-box">
+    <p><strong>R = f(x, y) = 350x + 200y</strong></p>
+    <p><strong>x</strong> = number of full-price tickets | <strong>y</strong> = number of discounted tickets</p>
+    <p>Increase x → R increases. So INCREASING in x. Increase y → R increases. So INCREASING in y.</p>
+  </div>
+
+  <h3>Solved Example — Car Rental</h3>
+  <p><strong>Formula:</strong> C = f(x, y) = 40x + 0.15y where x = days, y = miles driven</p>
+  <table>
+    <tr class="header"><th>f(x, y)</th><th>x (days)</th><th>y (miles)</th><th>Cost C ($)</th></tr>
+    <tr><td>f(5, 300)</td><td>5</td><td>300</td><td>40(5)+0.15(300) = $245</td></tr>
+    <tr class="boxed"><td>f(3, 100)</td><td>3</td><td>100</td><td>40(3)+0.15(100) = $135</td></tr>
+    <tr><td>f(3, 400)</td><td>3</td><td>400</td><td>40(3)+0.15(400) = $180</td></tr>
+  </table>
+
+  <h2>3. Comparative vs. Complementary Goods</h2>
+  <div class="two-col">
+    <div>
+      <h4>SUBSTITUTE GOODS</h4>
+      <p>When price of one goes UP, demand for the OTHER goes UP</p>
+      <p class="italic">Example: Coffee & Tea</p>
+    </div>
+    <div>
+      <h4>OWN-PRICE EFFECT</h4>
+      <p>When price of good goes UP, its OWN demand goes DOWN</p>
+      <p class="italic">Example: Coffee price</p>
+    </div>
+  </div>
+
+  <div class="urdu-box">
+    <h3>ROMAN URDU MEIN SAMJHAIN — Week 9</h3>
+    <ul>
+      <li>Pehle hum sirf f(x) padhte the — ek variable tha. Ab f(x,y) hai — do variables hain.</li>
+      <li>Pizza ki cost = f(size, toppings). Dono cheezein milkar cost decide karti hain.</li>
+    </ul>
+  </div>
+
+  <hr />
+
+  <h1>WEEK 10: COMPUTING PARTIAL DERIVATIVES ALGEBRAICALLY</h1>
+
+  <h2>1. The Golden Rule of Partial Derivatives</h2>
+  <div class="color-box">
+    <p><strong>When finding fx:</strong> Treat y as a CONSTANT.</p>
+    <p><strong>When finding fy:</strong> Treat x as a CONSTANT.</p>
+  </div>
+
+  <h2>2. Notation You Must Know</h2>
+  <table>
+    <tr class="header"><th>Notation</th><th>Meaning</th><th>How to Read</th></tr>
+    <tr class="boxed"><td>fx(x, y)</td><td>Partial of f w.r.t. x</td><td>f sub x</td></tr>
+    <tr><td>fy(x, y)</td><td>Partial of f w.r.t. y</td><td>f sub y</td></tr>
+  </table>
+
+  <h2>3. Basic Rules Review</h2>
+  <div class="formula-box">
+    <ul>
+      <li><strong>Rule 1 — Constant:</strong> d/dx (c) = 0</li>
+      <li><strong>Rule 2 — Constant multiply:</strong> d/dx (c x^n) = c * n x^(n-1)</li>
+      <li><strong>Rule 3 — Power rule:</strong> d/dx (x^n) = n x^(n-1)</li>
+    </ul>
+  </div>
+
+  <h2>4. Full Worked Examples with Steps</h2>
+  <h3>EXAMPLE A — Simple Polynomial: f(x, y) = x^2 + 5y^2</h3>
+  <div class="color-box">
+    <p><strong>fx =</strong> 2x</p>
+    <p><strong>fy =</strong> 10y</p>
+  </div>
+
+  <h3>EXAMPLE B — Mixed Term: f(x, y) = x^3*y^4</h3>
+  <div class="two-col">
+    <div><strong>fx</strong>: 3x^2 * y^4</div>
+    <div><strong>fy</strong>: 4x^3 * y^3</div>
+  </div>
+
+  <h3>EXAMPLE C — Log & Exponential: f = e^x * ln(y)</h3>
+  <div class="two-col">
+    <div><strong>fx</strong>: e^x * ln(y)</div>
+    <div><strong>fy</strong>: e^x * (1/y)</div>
+  </div>
+
+  <h3>EXAMPLE D — Function to a Power: f = (xy^2 + 1)^4</h3>
+  <div class="color-box">
+    <p><strong>fy</strong> = 8 x y (xy^2 + 1)^3</p>
+  </div>
+
+  <h3>EXAMPLE E — Quotient: g = xy / (x^2 + y^2)</h3>
+  <div class="color-box">
+    <p><strong>gx</strong> = (y^3 - x^2 y) / (x^2 + y^2)^2</p>
+  </div>
+
+  <h3>EXAMPLE F — Trig Functions: f(x, y) = cos(3x - 5y)</h3>
+  <div class="two-col">
+    <div><strong>fx</strong> = -3 sin(3x - 5y)</div>
+    <div><strong>fy</strong> = 5 sin(3x - 5y)</div>
+  </div>
+
+  <h2>5. Three Variable Functions</h2>
+  <div class="color-box">
+    <ul>
+      <li>When finding fx: treat BOTH y and z as constants</li>
+      <li>Compute ALL three partial derivatives if asked</li>
+    </ul>
+  </div>
+
+  <h2>6. Evaluating Partial Derivatives at a Point</h2>
+  <div class="color-box">
+    <p>Differentiate first, THEN substitute the point values.</p>
+    <p>Example: fy(1,3) for f = e^(x^2 + y^2) → fy = e^(x^2+y^2) * 2y → fy(1,3) = 6 e^10</p>
+  </div>
+
+  <h2>7. Quick Reference — All Partial Derivative Rules</h2>
+  <table>
+    <tr class="header"><th>Function Type</th><th>Partial w.r.t. x</th><th>Partial w.r.t. y</th></tr>
+    <tr class="boxed"><td>[f(x,y)]^n</td><td>n[f]^(n-1) * (df/dx)</td><td>n[f]^(n-1) * (df/dy)</td></tr>
+    <tr><td>ln(f)</td><td>(1/f) * (df/dx)</td><td>(1/f) * (df/dy)</td></tr>
+  </table>
+
+  <hr />
+  <h1>PRACTICE QUESTIONS — Try These First, Then Check Answers</h1>
+  <div class="color-box" style="background:#FFF0F0; border-color:#C00000;">
+    <p><strong>Q1.</strong> A hotel charges $80 per night per room and $5 per extra person. Write C = f(r, p) and find f(3,4).</p>
+    <p><strong>Answer:</strong> C = 80r + 5p → f(3,4) = 260</p>
+  </div>
+
+  <h1>ROMAN URDU MEIN POORI SUMMARY</h1>
+  <div class="urdu-box">
+    <h3>Week 9 — Functions of Several Variables (Roman Urdu)</h3>
+    <ul>
+      <li>Pehle hum ek variable ka function padhte the: y = f(x). Ab hum do variables ka function padhein ge: z = f(x, y).</li>
+      <li>fx ya df/dx: y ko constant samjho.</li>
+    </ul>
+  </div>
+
+  <div class="color-box">
+    <h3 class="center">EXAM CHEAT SHEET — Key Points at a Glance</h3>
+    <div class="two-col">
+      <div>
+        <strong>Week 9 Key Points</strong>
+        <p>z = f(x,y) — two inputs, one output</p>
+      </div>
+      <div>
+        <strong>Week 10 Key Points</strong>
+        <p>fx: differentiate w.r.t. x, treat y as constant</p>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
