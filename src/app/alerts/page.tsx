@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, CheckCircle, CloudLightning } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
 import { MetricCard } from "@/components/MetricCard";
@@ -9,6 +10,19 @@ import { useData } from "@/context/DataContext";
 
 export default function AlertsPage() {
   const { alerts, setAlerts } = useData();
+  const [gcpStatus, setGcpStatus] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch global GCP status (free public API)
+    fetch("https://status.cloud.google.com/incidents.json")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setGcpStatus(data.slice(0, 3)); // Only show top 3 recent incidents
+        }
+      })
+      .catch((err) => console.error("Failed to fetch GCP status", err));
+  }, []);
 
   return (
     <div className="page">
@@ -17,8 +31,50 @@ export default function AlertsPage() {
           <h1>Alerts & Notifications</h1>
           <p>Realtime alert feed, acknowledgement workflow, suppression rules, and delivery channels.</p>
         </div>
-        <ActionButton action="configure-alerts"><Bell size={16} /> Configure Channels</ActionButton>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            className="button"
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/notify", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    title: "Test Alert Triggered",
+                    message: "This is a manual test of the ASRMS Resend integration.",
+                    severity: "critical"
+                  })
+                });
+                if (res.ok) alert("Test email notification sent successfully!");
+                else alert("Failed to send notification.");
+              } catch (e) {
+                alert("Error sending notification.");
+              }
+            }}
+          >
+            <Bell size={16} /> Test Email Alert
+          </button>
+          <ActionButton action="configure-alerts"><Bell size={16} /> Configure Channels</ActionButton>
+        </div>
       </header>
+      
+      {gcpStatus.length > 0 && (
+        <section className="panel" style={{ borderLeft: "4px solid var(--warning)" }}>
+          <div className="section-head">
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CloudLightning size={18} /> Global Cloud Provider Incidents (GCP)
+            </h2>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+            {gcpStatus.map((incident: any) => (
+              <div key={incident.id} style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                <strong>{incident.external_desc}</strong> - Status: <StatusBadge value={incident.status_impact || 'unknown'} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="image-band alerts-band">
         <div>
           <h2>Incident response cockpit</h2>

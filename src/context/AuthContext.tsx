@@ -14,6 +14,7 @@ import {
   createUser,
   signIn,
   signOut,
+  subscribeToAuth,
   type SessionUser,
 } from "@/lib/auth";
 
@@ -36,18 +37,44 @@ const hiddenByRole: Record<string, string[]> = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = window.localStorage.getItem("asrms-session");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!user && pathname !== "/login") router.replace("/login");
-    if (user && pathname === "/login") router.replace("/dashboard");
-  }, [pathname, router, user]);
+    // Try to load initial session from localStorage for faster initial render
+    const saved = window.localStorage.getItem("asrms-session");
+    if (saved) {
+      try {
+        setUser(JSON.parse(saved));
+      } catch (e) {
+        window.localStorage.removeItem("asrms-session");
+      }
+    }
+    
+    // Then subscribe to real Firebase auth
+    const unsubscribe = subscribeToAuth((firebaseUser) => {
+      setLoading(false);
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        window.localStorage.setItem("asrms-session", JSON.stringify(firebaseUser));
+      } else {
+        setUser(null);
+        window.localStorage.removeItem("asrms-session");
+      }
+    });
+    
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user && pathname !== "/login") router.replace("/login");
+      if (user && pathname === "/login") router.replace("/dashboard");
+    }
+  }, [pathname, router, user, loading]);
 
   const persist = useCallback((nextUser: SessionUser) => {
     window.localStorage.setItem("asrms-session", JSON.stringify(nextUser));
@@ -58,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      loading: false,
+      loading,
       login: async (identifier, password) => persist(await signIn(identifier, password)),
       signup: async (email, password) => persist(await createUser(email, password)),
       logout: async () => {
@@ -72,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return !hiddenByRole[user.role].includes(area);
       },
     }),
-    [persist, router, user],
+    [persist, router, user, loading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

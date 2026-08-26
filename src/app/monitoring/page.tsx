@@ -7,14 +7,34 @@ import { DataTable } from "@/components/DataTable";
 import { LiveChart } from "@/components/LiveChart";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
-import { subscribeToMetrics, type MetricPoint } from "@/lib/realtimeDb";
+import type { MetricPoint } from "@/lib/realtimeDb";
 
 export default function MonitoringPage() {
   const { resources } = useData();
   const [points, setPoints] = useState<MetricPoint[]>([]);
   const [activeRange, setActiveRange] = useState("1h");
 
-  useEffect(() => subscribeToMetrics("res-web-01", setPoints), []);
+  const fetchMetrics = async () => {
+    try {
+      const res = await fetch("/api/monitoring?resourceId=res-web-01");
+      if (res.ok) {
+        const data = await res.json();
+        setPoints((prev) => {
+          const next = [...prev, data];
+          if (next.length > 20) next.shift(); // Keep last 20 points
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error("Failed to fetch metrics", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchMetrics(); // initial fetch
+    const interval = setInterval(fetchMetrics, 3000); // poll every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="page">

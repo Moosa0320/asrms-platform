@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Download, LockKeyhole } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
@@ -8,7 +9,32 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
 
 export default function AuditPage() {
-  const { auditLogs } = useData();
+  const { auditLogs, addAuditLog } = useData();
+  const [ipResolved, setIpResolved] = useState(false);
+
+  useEffect(() => {
+    if (!ipResolved) {
+      fetch("https://ipapi.co/json/")
+        .then(res => res.json())
+        .then(data => {
+          if (data.ip) {
+            const now = new Date();
+            addAuditLog({
+              id: `log-${Math.floor(Math.random() * 10000)}`,
+              timestamp: now.toISOString().replace('T', ' ').substring(0, 19),
+              userEmail: "current_user", // This would normally come from AuthContext
+              action: `LOGGED_IN_FROM_${data.city?.toUpperCase()}_${data.country_code}`,
+              resource: "System",
+              status: "success",
+              ipAddress: data.ip
+            });
+            setIpResolved(true);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [ipResolved, addAuditLog]);
+
   return (
     <div className="page">
       <header className="page-heading">

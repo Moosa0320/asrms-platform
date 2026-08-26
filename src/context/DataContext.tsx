@@ -14,6 +14,7 @@ import {
   auditLogs as initialAuditLogs,
   permissionMatrix,
 } from "@/lib/mockData";
+import { subscribeCollection } from "@/lib/firestore";
 
 type PolicyType = typeof initialPolicies[0];
 type ProviderType = typeof initialProviders[0];
@@ -66,6 +67,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [cloudProviders, setCloudProviders] = useState(initialProviders);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
   const [metricSeries, setMetricSeries] = useState(initialMetricSeries);
+
+  useEffect(() => {
+    const unsubscribe = subscribeCollection("users", (fetchedUsers) => {
+      if (fetchedUsers.length > 0) {
+        setUsers(fetchedUsers as typeof demoUsers);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Simulation Logic
   useEffect(() => {
