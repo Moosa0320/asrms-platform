@@ -39,20 +39,32 @@ export default function AlertsPage() {
               try {
                 const res = await fetch("/api/notify", {
                   method: "POST",
+                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    title: "Test Alert Triggered",
-                    message: "This is a manual test of the ASRMS Resend integration.",
-                    severity: "critical"
+                    type: "alert",
+                    title: "Manual Test Alert Triggered",
+                    message: "This is a real-time operational test of the ASRMS Resend Email integration. Your alert delivery pipeline is active and verified.",
+                    severity: "critical",
+                    metadata: {
+                      Pipeline: "Resend Email Dispatcher",
+                      Trigger: "Manual Console Test",
+                      Recipient: "moosashahid0320@gmail.com",
+                      Timestamp: new Date().toUTCString()
+                    }
                   })
                 });
-                if (res.ok) alert("Test email notification sent successfully!");
-                else alert("Failed to send notification.");
-              } catch (e) {
-                alert("Error sending notification.");
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  alert(`✅ Alert sent successfully via ${data.provider} to ${data.recipient}!`);
+                } else {
+                  alert(`⚠️ Notification warning: ${data.error || 'Check Resend key'}`);
+                }
+              } catch (e: any) {
+                alert(`❌ Error sending notification: ${e.message}`);
               }
             }}
           >
-            <Bell size={16} /> Test Email Alert
+            <Bell size={16} /> Test Real Email Alert
           </button>
           <ActionButton action="configure-alerts"><Bell size={16} /> Configure Channels</ActionButton>
         </div>

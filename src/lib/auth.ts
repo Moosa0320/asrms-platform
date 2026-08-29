@@ -131,6 +131,27 @@ export async function createUser(
   };
   await setDoc(doc(db, "users", cred.user.uid), newUser);
 
+  // Trigger admin email notification via Resend
+  try {
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "user_signup",
+        title: `New User Sign-up: ${email}`,
+        message: `A new user with email ${email} has just registered with requested role: ${requestedRole.toUpperCase()} (assigned initial role: ${role.toUpperCase()}).`,
+        severity: role === "pending" ? "warning" : "info",
+        metadata: {
+          UID: cred.user.uid,
+          Email: email,
+          "Requested Role": requestedRole,
+          "Assigned Role": role,
+          Time: new Date().toUTCString(),
+        },
+      }),
+    }).catch(() => {});
+  } catch {}
+
   return newUser;
 }
 

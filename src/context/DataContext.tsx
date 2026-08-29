@@ -144,14 +144,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
               const newAlert: AlertType = {
                 id: newAlertId,
                 severity: "critical",
-                title: "Simulated CPU Saturation",
-                message: `${criticalRes.name} CPU spiked to ${criticalRes.cpuUsage}%`,
+                title: "CPU Saturation Alert",
+                message: `${criticalRes.name} CPU spiked to ${criticalRes.cpuUsage}% in ${criticalRes.region}`,
                 resourceId: criticalRes.id,
                 acknowledged: false,
-                channel: "slack",
+                channel: "email",
                 delivered: true,
                 createdAt: timeStr
               };
+
+              // Trigger real Resend email notification
+              try {
+                fetch("/api/notify", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type: "cpu_spike",
+                    title: `CPU Spike Alert: ${criticalRes.name} at ${criticalRes.cpuUsage}%`,
+                    message: `Resource ${criticalRes.name} (${criticalRes.type} in ${criticalRes.region} on ${criticalRes.cloudProvider.toUpperCase()}) reached critical CPU saturation of ${criticalRes.cpuUsage}%. Auto-scaling policy evaluated.`,
+                    severity: "critical",
+                    metadata: {
+                      Resource: criticalRes.name,
+                      Provider: criticalRes.cloudProvider.toUpperCase(),
+                      Region: criticalRes.region,
+                      "CPU Usage": `${criticalRes.cpuUsage}%`,
+                      "Memory Usage": `${criticalRes.memoryUsage}%`,
+                      Status: "CRITICAL",
+                    },
+                  }),
+                }).catch(() => {});
+              } catch {}
               
               // Also add audit log
               setAuditLogs((logs) => [{

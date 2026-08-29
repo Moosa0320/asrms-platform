@@ -43,3 +43,4 @@ outputs/
 next-env.d.ts
 
 .vercel
+.env*
