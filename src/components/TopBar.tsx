@@ -124,18 +124,18 @@ export function TopBar() {
         <button className="user-chip" type="button" onClick={() => setProfileOpen(!profileOpen)}>
           <Shield size={16} />
           <span>{user?.displayName ?? "ASRMS User"}</span>
-          <small>{user?.role ?? "viewer"}</small>
+          <small>{user?.role === "super_admin" ? "Super Admin" : (user?.role ?? "viewer")}</small>
         </button>
         {profileOpen && (
           <section className="popover profile-popover">
             <header>
               <h3>{profile?.displayName ?? user?.displayName}</h3>
-              <StatusBadge value={profile?.role ?? user?.role ?? "viewer"} />
+              <StatusBadge value={user?.role === "super_admin" ? "super_admin" : (profile?.role ?? user?.role ?? "viewer")} />
             </header>
             <p><strong>Email:</strong> {profile?.email ?? user?.email}</p>
             <p><strong>Status:</strong> {profile?.status ?? "active"}</p>
             <p><strong>Last login:</strong> {profile?.lastLogin ?? "Current session"}</p>
-            <p><strong>Access:</strong> {user?.role === "admin" ? "Full platform control" : user?.role === "operator" ? "Monitoring and scaling operations" : user?.role === "developer" ? "Technical read-only visibility" : "Read-only visibility"}</p>
+            <p><strong>Access:</strong> {user?.role === "super_admin" ? "System Owner (Root privileges)" : user?.role === "admin" ? "Full platform control" : user?.role === "operator" ? "Monitoring and scaling operations" : user?.role === "developer" ? "Technical read-only visibility" : "Read-only visibility"}</p>
           </section>
         )}
 

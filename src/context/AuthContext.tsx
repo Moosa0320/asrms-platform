@@ -10,6 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
 import {
   createUser,
   signIn,
@@ -17,12 +19,13 @@ import {
   subscribeToAuth,
   type SessionUser,
 } from "@/lib/auth";
+import { type Role } from "@/lib/mockData";
 
 type AuthContextValue = {
   user: SessionUser | null;
   loading: boolean;
   login: (identifier: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, requestedRole?: string) => Promise<void>;
   logout: () => Promise<void>;
   canAccess: (area: string) => boolean;
 };
@@ -34,6 +37,8 @@ const hiddenByRole: Record<string, string[]> = {
   developer: ["scaling", "policies", "cost", "audit", "users", "settings"],
   operator: ["users", "settings"],
   admin: [],
+  super_admin: [],
+  pending: ["dashboard", "monitoring", "scaling", "policies", "predictive", "alerts", "providers", "resources", "cost", "audit", "users", "settings"],
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,7 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Try to load initial session from localStorage for faster initial render
     const saved = window.localStorage.getItem("asrms-session");
     if (saved) {
       try {
@@ -54,32 +58,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    // Then subscribe to real Firebase auth
+    let unsubFirestore: (() => void) | null = null;
+    
     const unsubscribe = subscribeToAuth((firebaseUser) => {
-      setLoading(false);
+      if (unsubFirestore) {
+        unsubFirestore();
+        unsubFirestore = null;
+      }
+
       if (firebaseUser) {
         setUser(firebaseUser);
         window.localStorage.setItem("asrms-session", JSON.stringify(firebaseUser));
+
+        if (isFirebaseConfigured && db) {
+          unsubFirestore = onSnapshot(doc(db, "users", firebaseUser.uid), (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              const updatedUser = {
+                ...firebaseUser,
+                role: (data.role || firebaseUser.role) as Role,
+                status: data.status || "active",
+                displayName: data.displayName || firebaseUser.displayName,
+              };
+              setUser(updatedUser);
+              window.localStorage.setItem("asrms-session", JSON.stringify(updatedUser));
+            }
+          });
+        }
+        setLoading(false);
       } else {
         setUser(null);
         window.localStorage.removeItem("asrms-session");
+        setLoading(false);
       }
     });
     
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubFirestore) unsubFirestore();
+    };
   }, []);
 
   useEffect(() => {
     if (!loading) {
       if (!user && pathname !== "/login") router.replace("/login");
-      if (user && pathname === "/login") router.replace("/dashboard");
+      if (user && pathname === "/login") {
+        if (user.role === "pending") {
+          // Stay on current page, ShellInner will show approval screen
+        } else {
+          router.replace("/dashboard");
+        }
+      }
     }
   }, [pathname, router, user, loading]);
 
   const persist = useCallback((nextUser: SessionUser) => {
     window.localStorage.setItem("asrms-session", JSON.stringify(nextUser));
     setUser(nextUser);
-    router.replace("/dashboard");
+    if (nextUser.role !== "pending") {
+      router.replace("/dashboard");
+    }
   }, [router]);
 
   const value = useMemo<AuthContextValue>(
@@ -87,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       login: async (identifier, password) => persist(await signIn(identifier, password)),
-      signup: async (email, password) => persist(await createUser(email, password)),
+      signup: async (email, password, requestedRole) => persist(await createUser(email, password, requestedRole)),
       logout: async () => {
         await signOut();
         window.localStorage.removeItem("asrms-session");
@@ -96,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       canAccess: (area) => {
         if (!user) return false;
-        return !hiddenByRole[user.role].includes(area);
+        return !hiddenByRole[user.role]?.includes(area);
       },
     }),
     [persist, router, user, loading],

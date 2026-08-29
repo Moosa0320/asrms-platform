@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import {
-  demoUsers,
   resources as initialResources,
   policies as initialPolicies,
   scalingEvents as initialScalingEvents,
@@ -13,8 +12,10 @@ import {
   metricSeries as initialMetricSeries,
   auditLogs as initialAuditLogs,
   permissionMatrix,
+  demoUsers,
 } from "@/lib/mockData";
 import { subscribeCollection } from "@/lib/firestore";
+import { isFirebaseConfigured, db } from "@/lib/firebase";
 
 type PolicyType = typeof initialPolicies[0];
 type ProviderType = typeof initialProviders[0];
@@ -40,7 +41,7 @@ type DataContextType = {
 
   addPolicy: (policy: PolicyType) => void;
   addProvider: (provider: ProviderType) => void;
-  addUser: (user: UserType) => void;
+  addUser: (user: UserType) => void | Promise<void>;
   addAuditLog: (log: AuditLogType) => void;
   addAlert: (alert: AlertType) => void;
   addResource: (res: ResourceType) => void;
@@ -48,7 +49,7 @@ type DataContextType = {
 
   removePolicy: (id: string) => void;
   removeProvider: (id: string) => void;
-  removeUser: (uid: string) => void;
+  removeUser: (uid: string) => void | Promise<void>;
   removeAuditLog: (id: string) => void;
   removeAlert: (id: string) => void;
   removeResource: (id: string) => void;
@@ -59,7 +60,7 @@ type DataContextType = {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState(demoUsers);
+  const [users, setUsers] = useState<typeof demoUsers>([]);
   const [resources, setResources] = useState(initialResources);
   const [policies, setPolicies] = useState(initialPolicies);
   const [scalingEvents, setScalingEvents] = useState(initialScalingEvents);
@@ -70,9 +71,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = subscribeCollection("users", (fetchedUsers) => {
-      if (fetchedUsers.length > 0) {
-        setUsers(fetchedUsers as typeof demoUsers);
-      }
+      setUsers(fetchedUsers as typeof demoUsers);
     });
     return () => unsubscribe();
   }, []);
@@ -212,7 +211,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addPolicy = (policy: PolicyType) => setPolicies((prev) => [...prev, policy]);
   const addProvider = (provider: ProviderType) => setCloudProviders((prev) => [...prev, provider]);
-  const addUser = (user: UserType) => setUsers((prev) => [...prev, user]);
+  const addUser = async (user: UserType) => {
+    if (isFirebaseConfigured && db) {
+      const { adminCreateUser } = await import("@/lib/auth");
+      await adminCreateUser(user.displayName, user.email, user.password || "temp123", user.role);
+    } else {
+      setUsers((prev) => [...prev, user]);
+    }
+  };
   const addAuditLog = (log: AuditLogType) => setAuditLogs((prev) => [log, ...prev]);
   const addAlert = (alert: AlertType) => setAlerts((prev) => [alert, ...prev]);
   const addResource = (res: ResourceType) => setResources((prev) => [...prev, res]);
@@ -220,7 +226,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const removePolicy = (id: string) => setPolicies((prev) => prev.filter(p => p.id !== id));
   const removeProvider = (id: string) => setCloudProviders((prev) => prev.filter(p => p.id !== id));
-  const removeUser = (uid: string) => setUsers((prev) => prev.filter(u => u.uid !== uid));
+  const removeUser = async (uid: string) => {
+    if (isFirebaseConfigured && db) {
+      const { deleteRecord } = await import("@/lib/firestore");
+      await deleteRecord("users", uid);
+    } else {
+      setUsers((prev) => prev.filter(u => u.uid !== uid));
+    }
+  };
   const removeAuditLog = (id: string) => setAuditLogs((prev) => prev.filter(l => l.id !== id));
   const removeAlert = (id: string) => setAlerts((prev) => prev.filter(a => a.id !== id));
   const removeResource = (id: string) => setResources((prev) => prev.filter(r => r.id !== id));

@@ -26,7 +26,7 @@ export function LiveChart({
   kind = "line",
   height = 280,
 }: {
-  data: Record<string, unknown>[];
+  data: any[];
   keys: string[];
   kind?: ChartKind;
   height?: number;

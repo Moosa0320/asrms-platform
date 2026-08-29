@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
 import { LiveChart } from "@/components/LiveChart";
@@ -9,19 +9,43 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
 import type { MetricPoint } from "@/lib/realtimeDb";
 
+interface MonitoringSnapshot extends MetricPoint {
+  resourceId?: string;
+  source?: string;
+  instanceId?: string;
+}
+
 export default function MonitoringPage() {
   const { resources } = useData();
-  const [points, setPoints] = useState<MetricPoint[]>([]);
+  const [points, setPoints] = useState<MonitoringSnapshot[]>([]);
   const [activeRange, setActiveRange] = useState("1h");
+  const [lastSnapshot, setLastSnapshot] = useState<MonitoringSnapshot | null>(null);
+  const [isLive, setIsLive] = useState(false);
+  const [selectedResource, setSelectedResource] = useState("gcp-free-vm");
+
+  const gcpVmResource = {
+    id: "gcp-free-vm",
+    name: "GCP e2-micro (Always Free)",
+    type: "vm",
+    cloudProvider: "gcp",
+    region: process.env.NEXT_PUBLIC_GCP_ZONE || "us-central1-a",
+  };
+
+  const allMonitorableResources = [
+    gcpVmResource,
+    ...resources.filter((r) => r.cloudProvider === "gcp"),
+  ];
 
   const fetchMetrics = async () => {
     try {
-      const res = await fetch("/api/monitoring?resourceId=res-web-01");
+      const res = await fetch(`/api/monitoring?resourceId=${selectedResource}`);
       if (res.ok) {
-        const data = await res.json();
+        const data: MonitoringSnapshot = await res.json();
+        setLastSnapshot(data);
+        setIsLive(data.source === "GCP Monitoring API (Live)");
         setPoints((prev) => {
           const next = [...prev, data];
-          if (next.length > 20) next.shift(); // Keep last 20 points
+          if (next.length > 20) next.shift();
           return next;
         });
       }
@@ -31,19 +55,69 @@ export default function MonitoringPage() {
   };
 
   useEffect(() => {
-    fetchMetrics(); // initial fetch
-    const interval = setInterval(fetchMetrics, 3000); // poll every 3 seconds
+    setPoints([]); // reset chart on resource change
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 3000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedResource]);
+
+  const cpuVal = lastSnapshot?.cpu ?? 0;
+  const memVal = lastSnapshot?.memory ?? 0;
+  const netVal = lastSnapshot?.network ?? 0;
+  const latVal = lastSnapshot?.latency ?? 0;
 
   return (
     <div className="page">
       <header className="page-heading">
         <div>
           <h1>Realtime Monitoring</h1>
-          <p>Resource metrics refresh every 10 seconds with health state and inventory context.</p>
+          <p>
+            {isLive
+              ? "Live data from GCP Cloud Monitoring API — e2-micro Always Free VM."
+              : "Simulated metrics — connect a GCP service account to switch to live data."}
+          </p>
         </div>
-        <div className="segmented">
+        <div className="segmented" style={{ alignItems: "center", gap: "8px" }}>
+          {/* Live/Simulated badge */}
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: 600,
+              background: isLive ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.10)",
+              color: isLive ? "var(--success)" : "var(--warning)",
+              border: `1px solid ${isLive ? "rgba(34,197,94,0.3)" : "rgba(245,158,11,0.3)"}`,
+            }}
+          >
+            {isLive ? <Wifi size={13} /> : <WifiOff size={13} />}
+            {isLive ? "Live GCP" : "Simulated"}
+          </span>
+
+          {/* Resource selector */}
+          <select
+            value={selectedResource}
+            onChange={(e) => setSelectedResource(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "#0d1424",
+              color: "var(--foreground)",
+              fontSize: "13px",
+            }}
+          >
+            {allMonitorableResources.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+
           {["1h", "6h", "24h", "7d"].map((range) => (
             <button
               className={activeRange === range ? "ghost-button selected" : "ghost-button"}
@@ -54,22 +128,58 @@ export default function MonitoringPage() {
               {range}
             </button>
           ))}
-          <ActionButton action="refresh-monitoring"><RefreshCw size={16} /> Refresh</ActionButton>
+          <ActionButton action="refresh-monitoring">
+            <RefreshCw size={16} /> Refresh
+          </ActionButton>
         </div>
       </header>
-      <section className="image-band monitoring-band">
-        <div>
-          <h2>Realtime telemetry stream</h2>
-          <p>Charts and health tables update against the same resource model used by scaling policies.</p>
+
+      {/* GCP VM KPI strip */}
+      <section className="grid kpis" style={{ marginBottom: "20px" }}>
+        <div className="panel" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: cpuVal > 80 ? "var(--critical)" : cpuVal > 60 ? "var(--warning)" : "var(--success)" }}>
+            {cpuVal}%
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>CPU Utilisation</div>
+        </div>
+        <div className="panel" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: memVal > 85 ? "var(--critical)" : memVal > 70 ? "var(--warning)" : "var(--success)" }}>
+            {memVal}%
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>Memory Used</div>
+        </div>
+        <div className="panel" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--primary)" }}>
+            {netVal} <span style={{ fontSize: "1rem" }}>Kbps</span>
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>Network Out</div>
+        </div>
+        <div className="panel" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: latVal > 100 ? "var(--warning)" : "var(--success)" }}>
+            {latVal} <span style={{ fontSize: "1rem" }}>ms</span>
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>Latency</div>
         </div>
       </section>
+
       <section className="panel">
         <div className="section-head">
           <h2>Live Metric Stream</h2>
-          <StatusBadge value="active" />
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <StatusBadge value="active" />
+            {lastSnapshot?.instanceId && (
+              <span style={{ fontSize: "11px", color: "var(--faint)" }}>
+                Instance: {lastSnapshot.instanceId}
+              </span>
+            )}
+            <span style={{ fontSize: "11px", color: "var(--faint)" }}>
+              {lastSnapshot?.source ?? ""}
+            </span>
+          </div>
         </div>
         <LiveChart data={points} keys={["cpu", "memory", "network", "latency"]} />
       </section>
+
       <section className="panel">
         <div className="section-head">
           <h2>Resource Health Grid</h2>

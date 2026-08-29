@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "./firebase";
 import {
@@ -58,7 +59,11 @@ export function subscribeCollection<T>(
     return () => undefined;
   }
 
-  const ref = query(collection(db, name), orderBy("timestamp", "desc"));
+  let ref = query(collection(db, name));
+  if (name === "audit_logs" || name === "scaling_events" || name === "alerts") {
+    ref = query(collection(db, name), orderBy("timestamp", "desc"));
+  }
+
   return onSnapshot(ref, (snapshot) => {
     callback(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }) as T));
   });
@@ -81,4 +86,12 @@ export async function updateRecord(
   if (!isFirebaseConfigured || !db) return { id, ...payload };
   await updateDoc(doc(db, name, id), payload);
   return { id, ...payload };
+}
+
+export async function deleteRecord(
+  name: CollectionName,
+  id: string,
+) {
+  if (!isFirebaseConfigured || !db) return;
+  await deleteDoc(doc(db, name, id));
 }

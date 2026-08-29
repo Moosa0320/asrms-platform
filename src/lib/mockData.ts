@@ -1,45 +1,17 @@
-export type Role = "admin" | "operator" | "viewer" | "developer";
+export type Role = "super_admin" | "admin" | "operator" | "viewer" | "developer" | "pending";
 export type Provider = "aws" | "azure" | "gcp";
 export type Health = "healthy" | "warning" | "critical" | "offline";
 
-export const demoUsers = [
-  {
-    uid: "u-admin",
-    displayName: "Moosa",
-    email: "admin@asrms.io",
-    password: "admin",
-    role: "admin" as Role,
-    status: "active",
-    lastLogin: "2026-06-10 22:21",
-  },
-  {
-    uid: "u-operator",
-    displayName: "Uzair",
-    email: "operator@asrms.io",
-    password: "operator123",
-    role: "operator" as Role,
-    status: "active",
-    lastLogin: "2026-06-10 21:48",
-  },
-  {
-    uid: "u-viewer",
-    displayName: "Noman",
-    email: "viewer@asrms.io",
-    password: "viewer123",
-    role: "viewer" as Role,
-    status: "active",
-    lastLogin: "2026-06-10 20:04",
-  },
-  {
-    uid: "u-developer",
-    displayName: "Manahil",
-    email: "developer@asrms.io",
-    password: "dev123",
-    role: "developer" as Role,
-    status: "inactive",
-    lastLogin: "2026-06-09 18:39",
-  },
-];
+export const demoUsers: {
+  uid: string;
+  displayName: string;
+  email: string;
+  password?: string;
+  role: Role;
+  status: string;
+  lastLogin?: string;
+}[] = [];
+
 
 export const resources = [
   {

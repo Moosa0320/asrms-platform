@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updatePassword,
+} from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -15,58 +20,94 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-async function createSuperAdmin() {
-  const email = "moosashahid0320@gmail.com";
-  const password = "Moosa@0320";
+const TARGET_EMAIL = "moosashahid0320@gmail.com";
+const TARGET_PASSWORD = "superadmin";
 
+// Known previous passwords to try if account already exists
+const KNOWN_PASSWORDS = ["Moosa@0320", "superadmin", "Moosa0320", "moosa0320"];
+
+async function upsertFirestore(uid) {
+  await setDoc(doc(db, "users", uid), {
+    uid,
+    displayName: "Moosa Shahid",
+    email: TARGET_EMAIL,
+    role: "admin",
+    status: "active",
+  });
+  console.log("✅ Firestore record created/updated with admin role.");
+}
+
+async function createSuperAdmin() {
+  // 1. Try creating a fresh account
   try {
-    console.log("Creating user in Firebase Auth...");
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = cred.user.uid;
-    
-    console.log("User created! UID:", uid);
-    console.log("Assigning admin role in Firestore...");
-    
-    const newUser = {
-      uid: uid,
-      displayName: "Moosa Shahid",
-      email: email,
-      role: "admin",
-      status: "active",
-    };
-    
-    await setDoc(doc(db, "users", uid), newUser);
-    
-    console.log("Success! Super admin account created and synced to Firestore.");
+    console.log("Attempting to create new Firebase Auth account...");
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      TARGET_EMAIL,
+      TARGET_PASSWORD
+    );
+    console.log("✅ Account created! UID:", cred.user.uid);
+    await upsertFirestore(cred.user.uid);
+    console.log(
+      "\n🎉 Super admin ready! Email:",
+      TARGET_EMAIL,
+      "| Password:",
+      TARGET_PASSWORD
+    );
     process.exit(0);
-  } catch (error) {
-    if (error.code === 'auth/email-already-in-use') {
-      console.log("Account already exists! Let's ensure they have the admin role in Firestore.");
-      // We can't fetch the UID easily without signing in if it already exists,
-      // but let's try signing in to get the UID and update it.
-      import("firebase/auth").then(async ({ signInWithEmailAndPassword }) => {
-        try {
-          const cred = await signInWithEmailAndPassword(auth, email, password);
-          const uid = cred.user.uid;
-          await setDoc(doc(db, "users", uid), {
-            uid: uid,
-            displayName: "Moosa Shahid",
-            email: email,
-            role: "admin",
-            status: "active",
-          });
-          console.log("Success! Account already existed, but has now been granted admin privileges in Firestore.");
-          process.exit(0);
-        } catch (signInErr) {
-          console.error("Error signing in to update role:", signInErr.message);
-          process.exit(1);
-        }
-      });
-    } else {
-      console.error("Error creating super admin:", error.message);
+  } catch (createErr) {
+    if (createErr.code !== "auth/email-already-in-use") {
+      console.error("❌ Unexpected error:", createErr.message);
       process.exit(1);
     }
   }
+
+  // 2. Account already exists — try signing in with known passwords
+  console.log(
+    "Account already exists. Attempting to sign in to update credentials..."
+  );
+  let signedInCred = null;
+
+  for (const pwd of KNOWN_PASSWORDS) {
+    try {
+      signedInCred = await signInWithEmailAndPassword(auth, TARGET_EMAIL, pwd);
+      console.log(`✅ Signed in with password: "${pwd}"`);
+      break;
+    } catch {
+      // try next
+    }
+  }
+
+  if (!signedInCred) {
+    console.error(
+      "❌ Could not sign in with any known password. Please reset the password manually in the Firebase Console:"
+    );
+    console.error(
+      "   https://console.firebase.google.com/project/asrms-e2f19/authentication/users"
+    );
+    process.exit(1);
+  }
+
+  const uid = signedInCred.user.uid;
+
+  // 3. Update password to the target one (if it was different)
+  try {
+    await updatePassword(signedInCred.user, TARGET_PASSWORD);
+    console.log(`✅ Password updated to "${TARGET_PASSWORD}".`);
+  } catch (pwErr) {
+    console.warn("⚠️  Could not update password:", pwErr.message);
+  }
+
+  // 4. Sync Firestore
+  await upsertFirestore(uid);
+
+  console.log(
+    "\n🎉 Super admin ready! Email:",
+    TARGET_EMAIL,
+    "| Password:",
+    TARGET_PASSWORD
+  );
+  process.exit(0);
 }
 
 createSuperAdmin();
