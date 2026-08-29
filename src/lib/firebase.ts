@@ -21,6 +21,11 @@ export const isFirebaseConfigured = Boolean(
     firebaseConfig.appId,
 );
 
+if (typeof window !== 'undefined') {
+  console.log("Firebase Configured:", isFirebaseConfigured, firebaseConfig);
+}
+
+
 export const firebaseApp = isFirebaseConfigured
   ? getApps()[0] ?? initializeApp(firebaseConfig)
   : null;
