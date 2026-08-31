@@ -86,9 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         }
       } else {
-        const savedSession = window.localStorage.getItem("asrms-session");
-        if (!savedSession) {
+        if (isFirebaseConfigured) {
+          // Firebase is configured: if Firebase Auth says no user is logged in, clear stale mock session
           setUser(null);
+          window.localStorage.removeItem("asrms-session");
+        } else {
+          const savedSession = window.localStorage.getItem("asrms-session");
+          if (!savedSession) {
+            setUser(null);
+          }
         }
       }
       setLoading(false);
