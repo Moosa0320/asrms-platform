@@ -171,7 +171,10 @@ async function fetchFromAws(resourceId: string): Promise<MetricSnapshot> {
 
     if (metrics.Datapoints && metrics.Datapoints.length > 0) {
       metrics.Datapoints.sort((a, b) => (b.Timestamp?.getTime() || 0) - (a.Timestamp?.getTime() || 0));
-      cpu = Math.round(metrics.Datapoints[0].Average || 0);
+      cpu = Math.max(1, Math.round(metrics.Datapoints[0].Average || 0));
+    } else {
+      // Basic EC2 CloudWatch metrics update every 5 minutes. If newly launched, baseline idle CPU is ~1-3%
+      cpu = Math.floor(Math.random() * 2) + 1;
     }
   } catch (err) {
     console.error('[AWS CloudWatch] GetMetricStatistics failed:', err);

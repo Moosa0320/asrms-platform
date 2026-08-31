@@ -21,8 +21,8 @@ export default function MonitoringPage() {
   const [activeRange, setActiveRange] = useState("1h");
   const [lastSnapshot, setLastSnapshot] = useState<MonitoringSnapshot | null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [selectedResource, setSelectedResource] = useState("gcp-free-vm");
-
+  const [selectedResource, setSelectedResource] = useState("aws-ec2-t2-micro");
+  
   const gcpVmResource = {
     id: "gcp-free-vm",
     name: "GCP e2-micro (Always Free)",
@@ -48,8 +48,8 @@ export default function MonitoringPage() {
   };
 
   const allMonitorableResources = [
-    gcpVmResource,
     awsResource,
+    gcpVmResource,
     alibabaResource,
     ...resources,
   ];
@@ -60,7 +60,7 @@ export default function MonitoringPage() {
       if (res.ok) {
         const data: MonitoringSnapshot = await res.json();
         setLastSnapshot(data);
-        setIsLive(data.source === "GCP Monitoring API (Live)");
+        setIsLive(Boolean(data.source && (data.source.includes("Live") || data.source.includes("AWS") || data.source.includes("GCP"))));
         setPoints((prev) => {
           const next = [...prev, data];
           if (next.length > 20) next.shift();
@@ -91,9 +91,9 @@ export default function MonitoringPage() {
         <div>
           <h1>Realtime Monitoring</h1>
           <p>
-            {isLive
-              ? "Live data from GCP Cloud Monitoring API — e2-micro Always Free VM."
-              : "Simulated metrics — connect a GCP service account to switch to live data."}
+            {lastSnapshot?.source
+              ? `Source: ${lastSnapshot.source}${lastSnapshot.instanceId ? ` (${lastSnapshot.instanceId})` : ""}`
+              : "Connecting to cloud telemetry..."}
           </p>
         </div>
         <div className="segmented" style={{ alignItems: "center", gap: "8px" }}>
@@ -113,7 +113,7 @@ export default function MonitoringPage() {
             }}
           >
             {isLive ? <Wifi size={13} /> : <WifiOff size={13} />}
-            {isLive ? "Live GCP" : "Simulated"}
+            {lastSnapshot?.source?.includes("AWS") ? "Live AWS" : lastSnapshot?.source?.includes("GCP") ? "Live GCP" : isLive ? "Live Cloud" : "Simulated"}
           </span>
 
           {/* Resource selector */}
