@@ -163,6 +163,7 @@ export async function signOut() {
 
 export function subscribeToAuth(callback: (user: SessionUser | null) => void) {
   if (!isFirebaseConfigured || !auth) {
+    callback(null);
     return () => {};
   }
   return onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {

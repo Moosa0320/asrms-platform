@@ -85,15 +85,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           });
         }
-        setLoading(false);
       } else {
-        setUser(null);
-        window.localStorage.removeItem("asrms-session");
-        setLoading(false);
+        const savedSession = window.localStorage.getItem("asrms-session");
+        if (!savedSession) {
+          setUser(null);
+        }
       }
+      setLoading(false);
     });
     
+    // Safety fallback: ensure loading screen NEVER hangs indefinitely
+    const timer = setTimeout(() => setLoading(false), 1500);
+    
     return () => {
+      clearTimeout(timer);
       unsubscribe();
       if (unsubFirestore) unsubFirestore();
     };
