@@ -122,7 +122,7 @@ export function TopBar() {
         )}
 
         <button className="user-chip" type="button" onClick={() => setProfileOpen(!profileOpen)}>
-          <Shield size={16} />
+          <img src="/asrms-logo.png" alt="Admin" style={{ width: 16, height: 16, objectFit: 'contain' }} />
           <span>{user?.displayName ?? "ASRMS User"}</span>
           <small>{user?.role === "super_admin" ? "Super Admin" : (user?.role ?? "viewer")}</small>
         </button>

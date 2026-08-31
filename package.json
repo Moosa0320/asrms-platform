@@ -10,6 +10,8 @@
     "generate-notes": "node scripts/generate_notes.js"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.1122.0",
+    "@aws-sdk/client-ec2": "^3.1122.0",
     "@google-cloud/monitoring": "^6.0.0",
     "firebase": "^12.14.0",
     "lucide-react": "^1.17.0",
