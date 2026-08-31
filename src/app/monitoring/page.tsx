@@ -31,9 +31,27 @@ export default function MonitoringPage() {
     region: process.env.NEXT_PUBLIC_GCP_ZONE || "us-central1-a",
   };
 
+  const alibabaResource = {
+    id: "alicloud-ecs-gateway",
+    name: "Alibaba Cloud ECS (ap-southeast-1)",
+    type: "container",
+    cloudProvider: "alibaba",
+    region: "ap-southeast-1",
+  };
+
+  const awsResource = {
+    id: "aws-ec2-t2-micro",
+    name: "AWS EC2 t2.micro (Free Tier)",
+    type: "vm",
+    cloudProvider: "aws",
+    region: "us-east-1",
+  };
+
   const allMonitorableResources = [
     gcpVmResource,
-    ...resources.filter((r) => r.cloudProvider === "gcp"),
+    awsResource,
+    alibabaResource,
+    ...resources,
   ];
 
   const fetchMetrics = async () => {

@@ -1,5 +1,5 @@
 export type Role = "super_admin" | "admin" | "operator" | "viewer" | "developer" | "pending";
-export type Provider = "aws" | "azure" | "gcp";
+export type Provider = "aws" | "azure" | "gcp" | "alibaba";
 export type Health = "healthy" | "warning" | "critical" | "offline";
 
 export const demoUsers: {
@@ -23,7 +23,7 @@ export const resources = [
     status: "warning" as Health,
     cpuUsage: 78,
     memoryUsage: 64,
-    tags: ["tier:api", "team:commerce"],
+    tags: ["tier:api", "aws-free-t2"],
     lastSyncAt: "46 sec ago",
   },
   {
@@ -35,7 +35,7 @@ export const resources = [
     status: "healthy" as Health,
     cpuUsage: 42,
     memoryUsage: 57,
-    tags: ["tier:data", "encrypted"],
+    tags: ["tier:data", "azure-b1s-free"],
     lastSyncAt: "1 min ago",
   },
   {
@@ -47,7 +47,7 @@ export const resources = [
     status: "critical" as Health,
     cpuUsage: 93,
     memoryUsage: 81,
-    tags: ["bursty", "ml"],
+    tags: ["gcp-e2-micro-free", "ml"],
     lastSyncAt: "12 sec ago",
   },
   {
@@ -61,6 +61,30 @@ export const resources = [
     memoryUsage: 49,
     tags: ["batch", "nightly"],
     lastSyncAt: "2 min ago",
+  },
+  {
+    id: "res-ali-01",
+    name: "alicloud-ecs-gateway",
+    type: "container",
+    cloudProvider: "alibaba" as Provider,
+    region: "ap-southeast-1",
+    status: "healthy" as Health,
+    cpuUsage: 48,
+    memoryUsage: 52,
+    tags: ["tier:gateway", "alicloud-ecs-free"],
+    lastSyncAt: "25 sec ago",
+  },
+  {
+    id: "res-gcp-02",
+    name: "gcp-cloud-run-ingress",
+    type: "function",
+    cloudProvider: "gcp" as Provider,
+    region: "us-central1",
+    status: "healthy" as Health,
+    cpuUsage: 22,
+    memoryUsage: 38,
+    tags: ["gcp-always-free", "serverless"],
+    lastSyncAt: "18 sec ago",
   },
 ];
 
@@ -104,6 +128,19 @@ export const policies = [
     version: 1,
     updatedAt: "2026-06-09 17:32",
   },
+  {
+    id: "pol-004",
+    name: "Alibaba ECS Auto-Expansion",
+    metric: "cpu",
+    cloudProvider: "alibaba",
+    thresholdUp: 75,
+    thresholdDown: 30,
+    priority: 8,
+    cooldownPeriod: 200,
+    status: "active",
+    version: 2,
+    updatedAt: "2026-06-11 08:15",
+  },
 ];
 
 export const scalingEvents = [
@@ -128,6 +165,17 @@ export const scalingEvents = [
     status: "pending",
     reason: "CPU sustained above 72%",
     timestamp: "22:24:03",
+  },
+  {
+    id: "evt-7740",
+    type: "scale-up",
+    resourceId: "res-ali-01",
+    policyId: "pol-004",
+    cloudProvider: "alibaba",
+    region: "ap-southeast-1",
+    status: "success",
+    reason: "Traffic burst detected on Singapore Gateway",
+    timestamp: "22:15:30",
   },
   {
     id: "evt-7738",
@@ -190,6 +238,26 @@ export const cloudProviders = [
     lastChecked: "31 sec ago",
   },
   {
+    id: "gcp-central",
+    provider: "gcp" as Provider,
+    displayName: "Google Cloud Platform",
+    region: "us-central1",
+    status: "online",
+    apiLatency: 49,
+    enabled: true,
+    lastChecked: "14 sec ago",
+  },
+  {
+    id: "alibaba-singapore",
+    provider: "alibaba" as Provider,
+    displayName: "Alibaba Cloud",
+    region: "ap-southeast-1",
+    status: "online",
+    apiLatency: 64,
+    enabled: true,
+    lastChecked: "10 sec ago",
+  },
+  {
     id: "azure-east",
     provider: "azure" as Provider,
     displayName: "Microsoft Azure",
@@ -198,16 +266,6 @@ export const cloudProviders = [
     apiLatency: 58,
     enabled: true,
     lastChecked: "48 sec ago",
-  },
-  {
-    id: "gcp-central",
-    provider: "gcp" as Provider,
-    displayName: "Google Cloud",
-    region: "us-central1",
-    status: "error",
-    apiLatency: 181,
-    enabled: true,
-    lastChecked: "14 sec ago",
   },
 ];
 

@@ -18,9 +18,9 @@ export default function CloudProvidersPage() {
         <ActionButton action="add-provider"><PlugZap size={16} /> Add Provider</ActionButton>
       </header>
       <section className="grid kpis">
-        <MetricCard label="Connected providers" value="2/3" trend="GCP has elevated latency" icon={<Cloud size={18} />} />
-        <MetricCard label="Avg API latency" value="94 ms" trend="16 ms above target" icon={<Cloud size={18} />} />
-        <MetricCard label="Regions covered" value="4" trend="US and EU active" icon={<Cloud size={18} />} />
+        <MetricCard label="Connected providers" value={`${cloudProviders.filter(p => p.enabled).length}/${cloudProviders.length}`} trend="AWS, GCP, Alibaba, Azure active" icon={<Cloud size={18} />} />
+        <MetricCard label="Avg API latency" value={`${Math.round(cloudProviders.reduce((acc, p) => acc + p.apiLatency, 0) / (cloudProviders.length || 1))} ms`} trend="Multi-cloud probe active" icon={<Cloud size={18} />} />
+        <MetricCard label="Regions covered" value={String(new Set(cloudProviders.map(p => p.region)).size)} trend="US, EU, AP-Southeast active" icon={<Cloud size={18} />} />
         <MetricCard label="Credential state" value="Sealed" trend="All encrypted at rest" icon={<PlugZap size={18} />} />
       </section>
       <section className="grid three">
