@@ -45,6 +45,7 @@ export default function ScalingPage() {
         resourceId: "AWS EC2 t3.micro (us-east-1)",
         policyId: "Manual-Operator-Policy",
         type: selectedAction === "start" || selectedAction === "scale_up" ? "scale_up" : "scale_down",
+        cloudProvider: "aws",
         timestamp: new Date().toLocaleTimeString(),
         reason: `${reason} (${user?.displayName || "User"})`,
         status: "success",
