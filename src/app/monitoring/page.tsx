@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, Wifi, WifiOff, Server, Terminal as TerminalIcon } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff, ExternalLink, Copy, Check, Server, Zap } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
-import { DataTable } from "@/components/DataTable";
 import { LiveChart } from "@/components/LiveChart";
 import { StatusBadge } from "@/components/StatusBadge";
-import { WebTerminal } from "@/components/WebTerminal";
 import { useData } from "@/context/DataContext";
 import type { MetricPoint } from "@/lib/realtimeDb";
 
@@ -19,21 +17,41 @@ interface MonitoringSnapshot extends MetricPoint {
 export default function MonitoringPage() {
   const { resources } = useData();
   const [points, setPoints] = useState<MonitoringSnapshot[]>([]);
-  const [activeRange, setActiveRange] = useState("1h");
   const [lastSnapshot, setLastSnapshot] = useState<MonitoringSnapshot | null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [selectedResource, setSelectedResource] = useState("aws-ec2-t3-micro");
-  const [showTerminal, setShowTerminal] = useState(true);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const awsResource = {
-    id: "aws-ec2-t3-micro",
-    name: "AWS EC2 t3.micro (us-east-1 Live)",
-    type: "vm",
-    cloudProvider: "aws",
-    region: "us-east-1",
-  };
+  // AWS-Only Monitorable Resources
+  const awsResources = [
+    {
+      id: "aws-ec2-t3-micro",
+      name: "AWS EC2 t3.micro Instance (us-east-1 Live)",
+      type: "vm",
+      cloudProvider: "aws",
+      region: "us-east-1",
+    },
+    ...resources.filter((r) => r.cloudProvider === "aws" && r.id !== "aws-ec2-t3-micro"),
+  ];
 
-  const allMonitorableResources = [awsResource, ...resources.filter(r => r.cloudProvider === "aws")];
+  const [selectedResource, setSelectedResource] = useState(awsResources[0].id);
+
+  const stressCommands = [
+    {
+      title: "🐍 Python 3 CPU & RAM Load Spike (Recommended)",
+      command: `python3 -c "import time; data = 'X' * (400 * 1024 * 1024); [sum(i*i for i in range(10000000)) for _ in iter(int, 1)]"`,
+      description: "Spikes Memory to ~80% and CPU to 100% instantly. Press Ctrl+C in AWS terminal to stop.",
+    },
+    {
+      title: "⚡ Official Linux Stress Tool (5-Minute Test)",
+      command: `sudo apt update && sudo apt install -y stress && stress --cpu 2 --vm 1 --vm-bytes 300M --timeout 300s`,
+      description: "Runs 100% CPU & 300MB RAM stress for 5 minutes and stops automatically.",
+    },
+    {
+      title: "🔥 Quick 1-Core CPU Loop",
+      command: `timeout 300 bash -c 'while true; do :; done' &`,
+      description: "Loads 1 vCPU core to 50% for 5 minutes in background. Stop with 'killall bash'.",
+    },
+  ];
 
   const fetchMetrics = async () => {
     try {
@@ -61,6 +79,12 @@ export default function MonitoringPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedResource]);
 
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
   const cpuVal = lastSnapshot?.cpu ?? 0;
   const memVal = lastSnapshot?.memory ?? 0;
   const netVal = lastSnapshot?.network ?? 0;
@@ -73,11 +97,12 @@ export default function MonitoringPage() {
           <h1>Realtime AWS Cloud Monitoring</h1>
           <p>
             {lastSnapshot?.source
-              ? `Source: ${lastSnapshot.source}${lastSnapshot.instanceId ? ` (ID: ${lastSnapshot.instanceId})` : ""}`
+              ? `Source: ${lastSnapshot.source}${lastSnapshot.instanceId ? ` (Target: ${lastSnapshot.instanceId})` : ""}`
               : "Connecting to AWS CloudWatch..."}
           </p>
         </div>
-        <div className="segmented" style={{ alignItems: "center", gap: "8px" }}>
+        <div className="segmented" style={{ alignItems: "center", gap: "10px" }}>
+          {/* Live Status Badge */}
           <span
             style={{
               display: "flex",
@@ -93,9 +118,10 @@ export default function MonitoringPage() {
             }}
           >
             {isLive ? <Wifi size={13} /> : <WifiOff size={13} />}
-            {lastSnapshot?.source?.includes("AWS") ? "Live AWS" : "Simulated"}
+            {lastSnapshot?.source?.includes("AWS") ? "Live AWS" : "Connecting"}
           </span>
 
+          {/* AWS-Only Dropdown */}
           <select
             value={selectedResource}
             onChange={(e) => setSelectedResource(e.target.value)}
@@ -108,21 +134,33 @@ export default function MonitoringPage() {
               fontSize: "13px",
             }}
           >
-            {allMonitorableResources.map((r) => (
+            {awsResources.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
               </option>
             ))}
           </select>
 
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setShowTerminal(!showTerminal)}
-            style={{ display: "flex", alignItems: "center", gap: "6px" }}
+          {/* Direct AWS EC2 Connect Link */}
+          <a
+            href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "6px",
+              background: "linear-gradient(135deg, #ff9900, #e68a00)",
+              color: "#000",
+              fontWeight: 600,
+              fontSize: "13px",
+              textDecoration: "none",
+            }}
           >
-            <TerminalIcon size={14} /> {showTerminal ? "Hide Console" : "Web SSH"}
-          </button>
+            <ExternalLink size={14} /> Open AWS Console
+          </a>
 
           <ActionButton action="refresh-monitoring">
             <RefreshCw size={16} /> Refresh
@@ -130,7 +168,7 @@ export default function MonitoringPage() {
         </div>
       </header>
 
-      {/* KPI Cards */}
+      {/* KPI Metric Cards */}
       <section className="grid kpis" style={{ marginBottom: "20px" }}>
         <div className="panel" style={{ textAlign: "center" }}>
           <div style={{ fontSize: "2rem", fontWeight: 700, color: cpuVal > 80 ? "var(--critical)" : cpuVal > 60 ? "var(--warning)" : "var(--success)" }}>
@@ -154,25 +192,14 @@ export default function MonitoringPage() {
           <div style={{ fontSize: "2rem", fontWeight: 700, color: latVal > 100 ? "var(--warning)" : "var(--success)" }}>
             {latVal} <span style={{ fontSize: "1rem" }}>ms</span>
           </div>
-          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>Network Latency</div>
+          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>AWS Latency</div>
         </div>
       </section>
 
-      {/* Embedded Web Terminal Section */}
-      {showTerminal && (
-        <section className="panel" style={{ marginBottom: "20px" }}>
-          <div className="section-head">
-            <h2>AWS Web SSH Console & Load Generator</h2>
-            <p>Run diagnostic commands or dispatch traffic surge commands directly to your cloud instance.</p>
-          </div>
-          <WebTerminal defaultCommand="status" />
-        </section>
-      )}
-
       {/* Live Chart Stream */}
-      <section className="panel">
+      <section className="panel" style={{ marginBottom: "20px" }}>
         <div className="section-head">
-          <h2>Live Cloud Metric Stream</h2>
+          <h2>AWS Live Metric Stream</h2>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <StatusBadge value="active" />
             {lastSnapshot?.instanceId && (
@@ -186,6 +213,69 @@ export default function MonitoringPage() {
           </div>
         </div>
         <LiveChart data={points} keys={["cpu", "memory", "network", "latency"]} />
+      </section>
+
+      {/* Direct AWS Stress & Load Commands Helper Panel */}
+      <section className="panel">
+        <div className="section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Zap style={{ color: "#ff9900" }} size={20} />
+            <h2>Direct AWS Load & Stress Commands</h2>
+          </div>
+          <p>Copy any command below, click "Open AWS Console" above, connect via EC2 Instance Connect, and paste to test real-world CPU/Memory scaling!</p>
+        </div>
+
+        <div style={{ display: "grid", gap: "12px", marginTop: "14px" }}>
+          {stressCommands.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                background: "#080c14",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "8px",
+                padding: "14px 16px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ fontWeight: 600, color: "#f3f4f6", fontSize: "13px" }}>{item.title}</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(item.command, idx)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 10px",
+                    borderRadius: "4px",
+                    background: copiedIndex === idx ? "rgba(34, 197, 94, 0.2)" : "rgba(255,255,255,0.08)",
+                    color: copiedIndex === idx ? "#4ade80" : "#9ca3af",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                  }}
+                >
+                  {copiedIndex === idx ? <Check size={13} /> : <Copy size={13} />}
+                  {copiedIndex === idx ? "Copied!" : "Copy Command"}
+                </button>
+              </div>
+              <p style={{ fontSize: "12px", color: "var(--faint)", margin: "0 0 8px 0" }}>{item.description}</p>
+              <code
+                style={{
+                  display: "block",
+                  background: "#05080f",
+                  padding: "10px 12px",
+                  borderRadius: "6px",
+                  color: "#38bdf8",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "12px",
+                  wordBreak: "break-all",
+                }}
+              >
+                {item.command}
+              </code>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

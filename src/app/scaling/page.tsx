@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Pause, Play, Zap, Power, RotateCw, Server, AlertCircle } from "lucide-react";
+import { Pause, Play, Zap, Power, RotateCw, Server, ShieldCheck } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { WebTerminal } from "@/components/WebTerminal";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 
 export default function ScalingPage() {
-  const { resources, scalingEvents, addScalingEvent } = useData();
+  const { scalingEvents, addScalingEvent } = useData();
   const { user } = useAuth();
   const role = user?.role || "viewer";
 
+  const [engineActive, setEngineActive] = useState(true);
   const [selectedAction, setSelectedAction] = useState("start");
-  const [reason, setReason] = useState("Manual operator override for capacity load adjustment.");
+  const [reason, setReason] = useState("Manual operator override for AWS EC2 instance scaling.");
   const [loadingAction, setLoadingAction] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ message?: string; error?: string } | null>(null);
 
@@ -41,15 +41,15 @@ export default function ScalingPage() {
 
       // Add to scaling decisions list
       addScalingEvent({
-        id: `scale-${Date.now()}`,
+        id: `evt-aws-${Date.now()}`,
         resourceId: "AWS EC2 t3.micro (us-east-1)",
-        policyId: "Manual-Operator-Policy",
+        policyId: "AWS-EC2-Target-CPU-70%",
         type: selectedAction === "start" || selectedAction === "scale_up" ? "scale_up" : "scale_down",
         cloudProvider: "aws",
-        timestamp: new Date().toLocaleTimeString(),
-        reason: `${reason} (${user?.displayName || "User"})`,
-        status: "success",
         region: "us-east-1",
+        status: "success",
+        reason: `${reason} (${user?.displayName || "Operator"})`,
+        timestamp: new Date().toLocaleTimeString(),
       });
     } catch (err: any) {
       setActionFeedback({ error: err.message });
@@ -63,36 +63,43 @@ export default function ScalingPage() {
       <header className="page-heading">
         <div>
           <h1>AWS Cloud Auto-Scaling Engine</h1>
-          <p>Real-world EC2 instance capacity control, automated policies, and Web Terminal operator console.</p>
+          <p>Real-world EC2 capacity control, AWS SDK scaling execution, and policy decision logs.</p>
         </div>
         <div className="actions">
-          <ActionButton action="pause-engine" className="ghost-button">
-            <Pause size={16} /> Engine Active
-          </ActionButton>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setEngineActive(!engineActive)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              background: engineActive ? "rgba(34, 197, 94, 0.12)" : "rgba(239, 68, 68, 0.12)",
+              color: engineActive ? "#4ade80" : "#f87171",
+              border: `1px solid ${engineActive ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+            }}
+          >
+            {engineActive ? <Play size={16} /> : <Pause size={16} />}
+            {engineActive ? "Engine Active" : "Engine Paused"}
+          </button>
         </div>
       </header>
 
       {/* KPI Cards */}
       <section className="grid kpis">
-        <MetricCard label="AWS Region" value="us-east-1" trend="Connected & Healthy" icon={<Server size={18} />} />
-        <MetricCard label="Target Resource" value="EC2 t3.micro" trend="AWS Cloud Machine" icon={<Play size={18} />} />
-        <MetricCard label="Scaling Policy" value="Target CPU 70%" trend="Active Rule" icon={<Zap size={18} />} />
-        <MetricCard label="Operator Role" value={role.toUpperCase()} trend={user?.displayName || "Authenticated"} icon={<Power size={18} />} />
-      </section>
-
-      {/* Web Terminal Section */}
-      <section className="panel" style={{ marginBottom: "20px" }}>
-        <div className="section-head">
-          <h2>Cloud Command Terminal (Web SSH)</h2>
-          <p>Run real-time diagnostics, check process uptime, or dispatch simulated traffic surge signals to AWS.</p>
-        </div>
-        <WebTerminal defaultCommand="status" />
+        <MetricCard label="AWS Region" value="us-east-1" trend="N. Virginia Region" icon={<Server size={18} />} />
+        <MetricCard label="Target Machine" value="EC2 t3.micro" trend="Live AWS Server" icon={<Play size={18} />} />
+        <MetricCard label="Target Scaling Rule" value="Target CPU 70%" trend="Active Policy" icon={<Zap size={18} />} />
+        <MetricCard label="Current Operator" value={role.toUpperCase()} trend={user?.displayName || "Authenticated"} icon={<Power size={18} />} />
       </section>
 
       <section className="grid two">
         {/* Scaling Events Log */}
         <div className="panel">
-          <h2>Recent Cloud Scaling Decisions</h2>
+          <h2>Recent AWS Scaling Decisions</h2>
+          <p style={{ fontSize: "12px", color: "var(--faint)", marginBottom: "14px" }}>
+            Real-time decision logs generated by AWS CloudWatch metrics and operator commands.
+          </p>
           <DataTable
             rows={scalingEvents}
             columns={[
@@ -108,7 +115,7 @@ export default function ScalingPage() {
 
         {/* AWS Scaling Action Form */}
         <div className="panel">
-          <h2>Direct AWS Instance Control</h2>
+          <h2>Direct AWS Instance Scaling Control</h2>
           <p style={{ fontSize: "12px", color: "var(--faint)", marginBottom: "14px" }}>
             Issue real-time Start, Stop, or Reboot commands directly to your connected AWS EC2 instance.
           </p>
@@ -127,14 +134,14 @@ export default function ScalingPage() {
 
           <form onSubmit={handleScalingSubmit} className="form-grid">
             <label className="field span-2">
-              Cloud Resource Target
+              Target AWS Resource
               <select disabled>
-                <option>AWS EC2 t3.micro (us-east-1) - Live Connected</option>
+                <option>AWS EC2 t3.micro (us-east-1) - Connected</option>
               </select>
             </label>
 
             <label className="field span-2">
-              Action Command
+              Scaling Command Action
               <select value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)}>
                 <option value="start">▶ Start EC2 Instance (Scale Up / Boot)</option>
                 <option value="stop">⏹ Stop EC2 Instance (Scale Down / Power Off)</option>
@@ -160,9 +167,10 @@ export default function ScalingPage() {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
-                background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                background: "linear-gradient(135deg, #ff9900, #e68a00)",
+                color: "#000",
                 padding: "12px",
-                fontWeight: 600,
+                fontWeight: 700,
                 borderRadius: "8px",
               }}
             >

@@ -1,6 +1,6 @@
 "use client";
 
-import { GitMerge, Save } from "lucide-react";
+import { GitMerge, Save, Plus } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -13,55 +13,97 @@ export default function PoliciesPage() {
     <div className="page">
       <header className="page-heading">
         <div>
-          <h1>Scaling Policies</h1>
-          <p>Create, edit, and resolve conflicts for priority-based scaling rules.</p>
+          <h1>AWS Scaling Policies</h1>
+          <p>Create, configure, and resolve priority rules for automated AWS EC2 scaling.</p>
         </div>
-        <ActionButton action="create-policy"><Save size={16} /> Create Policy</ActionButton>
+        <ActionButton action="create-policy">
+          <Plus size={16} /> Create AWS Policy
+        </ActionButton>
       </header>
+
       <section className="grid two">
         <div className="panel">
-          <h2>Policy Registry</h2>
+          <h2>Active AWS Policies</h2>
           <DataTable
             rows={policies}
             columns={[
-              { key: "name", header: "Name" },
+              { key: "name", header: "Policy Name" },
               { key: "metric", header: "Metric" },
-              { key: "cloudProvider", header: "Provider" },
-              { key: "thresholdUp", header: "Up" },
-              { key: "thresholdDown", header: "Down" },
+              { key: "cloudProvider", header: "Provider", render: () => "AWS" },
+              { key: "thresholdUp", header: "Scale Up %" },
+              { key: "thresholdDown", header: "Scale Down %" },
               { key: "priority", header: "Priority" },
               { key: "status", header: "Status", render: (row) => <StatusBadge value={String(row.status)} /> },
-              { key: "id", header: "Action", render: (row) => (
-                <button className="ghost-button" style={{ color: "var(--danger)" }} onClick={() => removePolicy(row.id)}>Remove</button>
-              )},
+              {
+                key: "id",
+                header: "Action",
+                render: (row) => (
+                  <button
+                    className="ghost-button"
+                    style={{ color: "var(--danger)" }}
+                    onClick={() => removePolicy(row.id)}
+                  >
+                    Remove
+                  </button>
+                ),
+              },
             ]}
           />
         </div>
+
         <div className="panel">
-          <h2>Policy Editor</h2>
+          <h2>AWS Policy Editor</h2>
           <div className="form-grid">
-            <label className="field span-2">Name<input defaultValue="API CPU Burst Guard" /></label>
-            <label className="field">Metric<select><option>cpu</option><option>memory</option><option>latency</option></select></label>
-            <label className="field">Provider<select><option>aws</option><option>azure</option><option>gcp</option><option>all</option></select></label>
-            <label className="field">Scale up at<input defaultValue="72" /></label>
-            <label className="field">Scale down at<input defaultValue="34" /></label>
-            <label className="field">Priority<input defaultValue="9" /></label>
-            <label className="field">Cooldown<input defaultValue="180" /></label>
-            <ActionButton action="save-policy" className="button span-2">Save Draft</ActionButton>
+            <label className="field span-2">
+              Policy Name
+              <input defaultValue="AWS EC2 Dynamic Burst Guard" />
+            </label>
+            <label className="field">
+              Target Metric
+              <select>
+                <option>cpu</option>
+                <option>memory</option>
+                <option>latency</option>
+              </select>
+            </label>
+            <label className="field">
+              Target Provider
+              <select disabled>
+                <option>Amazon Web Services (AWS)</option>
+              </select>
+            </label>
+            <label className="field">
+              Scale up at (%)
+              <input defaultValue="70" />
+            </label>
+            <label className="field">
+              Scale down at (%)
+              <input defaultValue="30" />
+            </label>
+            <label className="field">
+              Priority Weight
+              <input defaultValue="10" />
+            </label>
+            <label className="field">
+              Cooldown (seconds)
+              <input defaultValue="180" />
+            </label>
+            <ActionButton action="save-policy" className="button span-2">
+              Save Policy Draft
+            </ActionButton>
           </div>
         </div>
       </section>
-      <section className="panel">
+
+      <section className="panel" style={{ marginTop: "20px" }}>
         <div className="section-head">
           <div>
-            <h2>Conflict Detection</h2>
-            <p>Cloud Function `resolveConflicts` evaluates metric overlap, provider scope, and priority.</p>
+            <h2>AWS Conflict Detection &amp; Priority Engine</h2>
+            <p>Evaluates policy overlaps, threshold collisions, and priority weights across AWS resources.</p>
           </div>
-          <ActionButton action="resolve-conflicts" className="ghost-button"><GitMerge size={16} /> Resolve Conflicts</ActionButton>
-        </div>
-        <div className="alert-row">
-          <div><strong>No blocking conflicts</strong><p>Latency Pre-Scale overlaps AWS Burst Guard only outside provider scope.</p></div>
-          <StatusBadge value="success" />
+          <ActionButton action="resolve-conflicts" className="ghost-button">
+            <GitMerge size={16} /> Resolve Conflicts
+          </ActionButton>
         </div>
       </section>
     </div>
