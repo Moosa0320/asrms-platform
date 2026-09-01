@@ -155,7 +155,7 @@ async function fetchFromAws(resourceId: string): Promise<MetricSnapshot> {
   }
 
   const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - 10 * 60 * 1000); // last 10 mins to ensure we get data points
+  const startTime = new Date(endTime.getTime() - 30 * 60 * 1000); // last 30 mins for 5-min CloudWatch roll-ups
 
   let cpu = 0;
   try {
@@ -165,15 +165,15 @@ async function fetchFromAws(resourceId: string): Promise<MetricSnapshot> {
       Dimensions: [{ Name: 'InstanceId', Value: instanceId }],
       StartTime: startTime,
       EndTime: endTime,
-      Period: 60,
-      Statistics: ['Average'],
+      Period: 300, // 300s (5-min) is standard resolution for free EC2 CloudWatch metrics
+      Statistics: ['Average', 'Maximum'],
     }));
 
     if (metrics.Datapoints && metrics.Datapoints.length > 0) {
       metrics.Datapoints.sort((a, b) => (b.Timestamp?.getTime() || 0) - (a.Timestamp?.getTime() || 0));
-      cpu = Math.max(1, Math.round(metrics.Datapoints[0].Average || 0));
+      const latestPoint = metrics.Datapoints[0];
+      cpu = Math.max(1, Math.round(latestPoint.Maximum || latestPoint.Average || 0));
     } else {
-      // Basic EC2 CloudWatch metrics update every 5 minutes. If newly launched, baseline idle CPU is ~1-3%
       cpu = Math.floor(Math.random() * 2) + 1;
     }
   } catch (err) {
