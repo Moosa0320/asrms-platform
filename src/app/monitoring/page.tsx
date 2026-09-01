@@ -37,19 +37,19 @@ export default function MonitoringPage() {
 
   const stressCommands = [
     {
-      title: "🐍 Python 3 CPU & RAM Load Spike (Recommended)",
-      command: `python3 -c "import time; data = 'X' * (400 * 1024 * 1024); [sum(i*i for i in range(10000000)) for _ in iter(int, 1)]"`,
-      description: "Spikes Memory to ~80% and CPU to 100% instantly. Press Ctrl+C in AWS terminal to stop.",
+      title: "🐍 Python 3 Live Stress Test (60s Auto-Timer with Progress)",
+      command: `python3 -c "import time; print('🔥 400MB RAM & 100% CPU Stress Started...'); d='X'*(400*1024*1024); t=time.time()+60\nwhile time.time()<t:\n  sum(i*i for i in range(1000000))\n  print(f'⚡ Stressing: {int(t-time.time())}s remaining', end='\\r', flush=True)\nprint('\\n✓ Completed!')"`,
+      description: "Allocates 400MB RAM and drives CPU to 100% with a live second-by-second countdown. Auto-stops after 60s.",
     },
     {
-      title: "⚡ Official Linux Stress Tool (5-Minute Test)",
+      title: "⚡ Standard Linux Stress Utility (5-Minute Run)",
       command: `sudo apt update && sudo apt install -y stress && stress --cpu 2 --vm 1 --vm-bytes 300M --timeout 300s`,
-      description: "Runs 100% CPU & 300MB RAM stress for 5 minutes and stops automatically.",
+      description: "Official Linux stress utility. Runs 100% CPU & 300MB RAM load for 5 minutes and exits automatically.",
     },
     {
-      title: "🔥 Quick 1-Core CPU Loop",
+      title: "🔥 Quick Background 1-Core CPU Loop",
       command: `timeout 300 bash -c 'while true; do :; done' &`,
-      description: "Loads 1 vCPU core to 50% for 5 minutes in background. Stop with 'killall bash'.",
+      description: "Runs 50% CPU in the background for 5 minutes. Stop anytime with 'killall bash'.",
     },
   ];
 
