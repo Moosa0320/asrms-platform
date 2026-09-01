@@ -223,7 +223,7 @@ export function WebTerminal({ defaultCommand = "status" }: { defaultCommand?: st
               <span style={{ color: "#38bdf8", fontWeight: 600 }}>{log.text}</span>
             )}
             {log.type === "system" && (
-              <span style={{ color: "#9ca3af", italic: "true" }}>[SYSTEM] {log.text}</span>
+              <span style={{ color: "#9ca3af", fontStyle: "italic" }}>[SYSTEM] {log.text}</span>
             )}
             {log.type === "output" && (
               <pre style={{ margin: 0, color: "#4ade80", whiteSpace: "pre-wrap" }}>{log.text}</pre>
