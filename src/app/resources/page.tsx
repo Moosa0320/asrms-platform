@@ -21,8 +21,8 @@ export default function ResourcesPage() {
           <p>Live inventory of your connected Amazon Web Services EC2 instances, EBS volumes, and Auto-Scaling Groups.</p>
         </div>
         <div className="actions">
-          <ActionButton action="register-resource">
-            <Plus size={16} /> Add AWS Resource
+          <ActionButton action="refresh-discovery">
+            <RefreshCw size={16} /> Refresh AWS Discovery
           </ActionButton>
         </div>
       </header>
