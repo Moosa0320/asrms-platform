@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity, Bell, Clipboard, ClipboardCheck, Cpu, Database,
-  Download, ExternalLink, Gauge, Plus, RotateCw, TerminalSquare,
-  Zap, CheckCircle, AlertTriangle,
+  Download, ExternalLink, Gauge, Plus, TerminalSquare,
 } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
@@ -14,38 +13,41 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
 import { useAppActions } from "@/context/AppActionsContext";
 
-// ─── Stress commands for quick-launch ────────────────────────────────────────
+// ─── Verified Linux / Bash Stress Commands (No Emojis) ───────────────────────
 const STRESS_CMDS = [
   {
-    id: "python60",
-    label: "Python 60 s countdown stress",
-    description: "Burns CPU with matrix math while showing a live countdown timer",
-    cmd: `python3 -c "
-import time, sys
-end = time.time() + 60
-while time.time() < end:
-    remaining = int(end - time.time())
-    sys.stdout.write(f'\\r⚡ Stressing CPU... {remaining:2d}s remaining ')
-    sys.stdout.flush()
-    sum(i*i for i in range(500000))
-print('\\n✓ Done')
-"`,
+    id: "cpu-60s",
+    label: "CPU Load (All Cores, 60 Seconds)",
+    description: "Spawns parallel yes processes across all CPU cores and auto-terminates after 60s.",
+    cmd: "for i in $(seq 1 $(nproc)); do yes > /dev/null & done; sleep 60; killall yes",
   },
   {
-    id: "stress5",
-    label: "stress-ng 5 min full-core test",
-    description: "Requires stress-ng installed on the instance. Saturates all CPU cores for 5 minutes.",
-    cmd: "stress-ng --cpu 0 --timeout 300s --metrics-brief",
+    id: "cpu-mem-python",
+    label: "CPU + Memory Stress (Python3, 60 Seconds)",
+    description: "Allocates 300MB RAM and runs continuous floating-point iterations for 60s.",
+    cmd: `python3 -c "import time; data = bytearray(300 * 1024 * 1024); t = time.time() + 60; [i*i for i in range(100000000) if time.time() < t]"`,
   },
   {
-    id: "dd",
-    label: "Background CPU loop (no install needed)",
-    description: "Pure bash — runs forever in the background until killed with kill %1",
+    id: "stress-pkg",
+    label: "Linux Stress Utility (60 Seconds)",
+    description: "Installs and executes stress tool for 2 CPU workers and 256MB memory.",
+    cmd: "sudo apt update && sudo apt install -y stress 2>/dev/null || sudo yum install -y stress 2>/dev/null; stress --cpu 2 --vm 1 --vm-bytes 256M --timeout 60s",
+  },
+  {
+    id: "bg-loop",
+    label: "Background Infinite CPU Loop",
+    description: "Runs infinite while loop in background. Stop with: pkill -f 'while true'",
     cmd: "while true; do :; done &",
+  },
+  {
+    id: "stop-all",
+    label: "Terminate All Active Stress Processes",
+    description: "Immediately kills all background yes, python, while loops, and stress processes.",
+    cmd: "killall yes 2>/dev/null; pkill -f 'while true' 2>/dev/null; pkill -f python3 2>/dev/null; killall stress 2>/dev/null",
   },
 ];
 
-// ─── CopyButton ──────────────────────────────────────────────────────────────
+// ─── Copy Button ─────────────────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -73,27 +75,17 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Dashboard Page ──────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { resources, scalingEvents, addScalingEvent } = useData();
+  const { resources, scalingEvents } = useData();
   const { notifications } = useAppActions();
 
   const [liveTelemetry, setLiveTelemetry] = useState<{
-    cpu: number; memory: number; network: number; latency: number; source?: string;
+    cpu: number; memory: number; network: number; latency: number; source?: string; instanceId?: string; state?: string;
   } | null>(null);
   const [metricHistory, setMetricHistory] = useState<any[]>([]);
 
-  // Auto-Scale Engine state
-  const [autoScaleEnabled, setAutoScaleEnabled] = useState(true);
-  const [cpuThreshold, setCpuThreshold] = useState(70);
-  const [autoScaleLog, setAutoScaleLog] = useState<
-    { time: string; message: string; type: "info" | "success" | "warning" }[]
-  >([]);
-  const [autoScaleChecking, setAutoScaleChecking] = useState(false);
-  const autoScaleRef = useRef(autoScaleEnabled);
-  autoScaleRef.current = autoScaleEnabled;
-
-  // Live telemetry polling — every 3 s
+  // Live telemetry polling — every 3 seconds
   useEffect(() => {
     const fetchLive = async () => {
       try {
@@ -103,7 +95,7 @@ export default function DashboardPage() {
           setLiveTelemetry(data);
           setMetricHistory((prev) => {
             const next = [...prev, { ...data, time: new Date().toLocaleTimeString() }];
-            if (next.length > 15) next.shift();
+            if (next.length > 20) next.shift();
             return next;
           });
         }
@@ -114,67 +106,20 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Autonomous Auto-Scale Engine — polls every 15 s
-  useEffect(() => {
-    const runCheck = async () => {
-      if (!autoScaleRef.current) return;
-      setAutoScaleChecking(true);
-      try {
-        const res = await fetch("/api/scaling/autoscale", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ threshold: cpuThreshold, cpu: liveTelemetry?.cpu }),
-        });
-        const data = await res.json();
-        const time = new Date().toLocaleTimeString();
-
-        if (data.triggered) {
-          setAutoScaleLog((p) => [{ time, message: data.message, type: "success" }, ...p.slice(0, 9)]);
-          addScalingEvent({
-            id: `evt-auto-${Date.now()}`,
-            type: "scale_up",
-            resourceId: `AWS EC2 (${data.instanceId || "us-east-1"})`,
-            policyId: "AWS EC2 Target CPU Policy",
-            cloudProvider: "aws",
-            region: "us-east-1",
-            status: "success",
-            reason: `Auto-Scaler: CPU ${data.cpu}% ≥ threshold ${cpuThreshold}%`,
-            timestamp: time,
-          });
-        } else if (data.inCooldown) {
-          setAutoScaleLog((p) => [{ time, message: data.message, type: "warning" }, ...p.slice(0, 9)]);
-        } else {
-          setAutoScaleLog((p) => [
-            { time, message: `CPU ${data.cpu ?? liveTelemetry?.cpu ?? "?"}% — below threshold (${cpuThreshold}%). Standby.`, type: "info" },
-            ...p.slice(0, 9),
-          ]);
-        }
-      } catch (err: any) {
-        setAutoScaleLog((p) => [{ time: new Date().toLocaleTimeString(), message: `Engine error: ${err.message}`, type: "warning" }, ...p.slice(0, 9)]);
-      } finally {
-        setAutoScaleChecking(false);
-      }
-    };
-    const interval = setInterval(runCheck, 15000);
-    runCheck();
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cpuThreshold]);
-
   const awsResources = resources.filter((r) => r.cloudProvider === "aws");
-  const liveCpu    = liveTelemetry?.cpu     ?? 12;
-  const liveMemory = liveTelemetry?.memory  ?? 52;
-  const liveLatency = liveTelemetry?.latency ?? 24;
-  const isCpuBreaching = liveCpu >= cpuThreshold;
+  const liveCpu = liveTelemetry?.cpu ?? 0;
+  const liveMemory = liveTelemetry?.memory ?? 0;
+  const liveLatency = liveTelemetry?.latency ?? 22;
+  const isCpuBreaching = liveCpu >= 70;
   const unreadAlerts = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="page">
-      {/* Page heading */}
+      {/* Page Heading */}
       <header className="page-heading">
         <div>
           <h1>AWS Cloud Operations Center</h1>
-          <p>Real-time CloudWatch telemetry and autonomous scaling engine for Amazon Web Services.</p>
+          <p>Real-time CloudWatch telemetry, infrastructure scaling decisions, and resource monitoring.</p>
         </div>
         <div className="actions">
           <span className="live-dot">AWS connected</span>
@@ -190,14 +135,6 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Hero band */}
-      <section className="image-band dashboard-band">
-        <div>
-          <h2>Autonomous Cloud Operations Surface</h2>
-          <p>Live CloudWatch streams, autonomous scaling policies, and compliance telemetry in one unified platform.</p>
-        </div>
-      </section>
-
       {/* KPI Cards */}
       <section className="grid kpis">
         <MetricCard
@@ -209,139 +146,44 @@ export default function DashboardPage() {
         <MetricCard
           label="Live CPU"
           value={`${liveCpu}%`}
-          trend={isCpuBreaching ? "⚡ Threshold breached!" : `Threshold: ${cpuThreshold}%`}
+          trend={isCpuBreaching ? "Threshold breached (70%)" : "Target threshold: 70%"}
           icon={<Cpu size={15} />}
           breaching={isCpuBreaching}
         />
         <MetricCard
-          label="Memory"
+          label="Memory Footprint"
           value={`${liveMemory}%`}
-          trend="Within policy envelope"
+          trend="Policy threshold: 85%"
           icon={<Activity size={15} />}
         />
         <MetricCard
-          label="Open alerts"
+          label="Open Alerts"
           value={String(unreadAlerts)}
-          trend={unreadAlerts > 0 ? "Requires attention" : "All clear"}
+          trend={unreadAlerts > 0 ? "Requires review" : "All systems normal"}
           icon={<Bell size={15} />}
         />
       </section>
 
-      {/* Chart + Auto-Scale Engine */}
-      <section className="grid two">
-
-        {/* Live metric chart */}
-        <div className="panel">
-          <div className="section-head" style={{ marginBottom: "12px" }}>
-            <div>
-              <h2>Live AWS Metric Stream</h2>
-              <p style={{ marginTop: "2px", fontSize: "11px" }}>
-                {liveTelemetry?.source ?? "Connecting to CloudWatch…"}
-              </p>
-            </div>
-            <StatusBadge value="active" />
+      {/* Live Metric Stream Chart */}
+      <section className="panel">
+        <div className="section-head" style={{ marginBottom: "12px" }}>
+          <div>
+            <h2>Live AWS Metric Stream</h2>
+            <p style={{ marginTop: "2px", fontSize: "11px" }}>
+              {liveTelemetry?.source ?? "Connecting to AWS CloudWatch..."}
+            </p>
           </div>
-          <LiveChart data={metricHistory} keys={["cpu", "memory", "network", "latency"]} kind="area" />
+          <StatusBadge value={liveTelemetry?.state === "stopped" ? "inactive" : "active"} />
         </div>
-
-        {/* Autonomous Auto-Scale Engine */}
-        <div className="panel" style={{
-          borderLeft: "2px solid var(--accent-line)",
-          display: "flex", flexDirection: "column", gap: "12px",
-        }}>
-          <div className="section-head">
-            <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-              <Zap size={15} style={{ color: "var(--warning)" }} />
-              <h2>Auto-Scale Engine</h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setAutoScaleEnabled(!autoScaleEnabled);
-                setAutoScaleLog((p) => [{
-                  time: new Date().toLocaleTimeString(),
-                  message: !autoScaleEnabled
-                    ? "Engine ENABLED — monitoring every 15 s"
-                    : "Engine PAUSED",
-                  type: !autoScaleEnabled ? "success" : "warning",
-                }, ...p.slice(0, 9)]);
-              }}
-              style={{
-                display: "flex", alignItems: "center", gap: "5px",
-                padding: "4px 10px", borderRadius: "4px", cursor: "pointer",
-                fontSize: "11px", fontFamily: "var(--font-data)",
-                background: autoScaleEnabled ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)",
-                border: `1px solid ${autoScaleEnabled ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
-                color: autoScaleEnabled ? "var(--success)" : "var(--critical)",
-              }}
-            >
-              {autoScaleEnabled ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
-              {autoScaleEnabled ? "Active" : "Paused"}
-            </button>
-          </div>
-
-          {/* Threshold slider */}
-          <div style={{ background: "#0E1118", borderRadius: "5px", padding: "10px 12px", border: "1px solid var(--border)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span style={{ fontSize: "11px", color: "var(--faint)" }}>CPU threshold</span>
-              <strong style={{ fontSize: "13px", fontFamily: "var(--font-data)", color: "var(--warning)" }}>{cpuThreshold}%</strong>
-            </div>
-            <input type="range" min={30} max={95} step={5} value={cpuThreshold}
-              onChange={(e) => setCpuThreshold(Number(e.target.value))}
-              style={{ width: "100%", accentColor: "var(--warning)" }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--faint)", fontFamily: "var(--font-data)", marginTop: "3px" }}>
-              <span>30% aggressive</span><span>95% conservative</span>
-            </div>
-          </div>
-
-          {/* Live status row */}
-          <div style={{ display: "flex", gap: "8px" }}>
-            {[
-              { label: "Live CPU", value: `${liveCpu}%`, color: isCpuBreaching ? "var(--warning)" : "var(--success)" },
-              { label: "Threshold", value: `${cpuThreshold}%`, color: "var(--warning)" },
-              { label: "Interval", value: autoScaleChecking ? "…" : "15 s", color: "var(--primary)" },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{
-                flex: 1, background: "#0E1118", padding: "8px 10px",
-                borderRadius: "5px", border: "1px solid var(--border)", textAlign: "center",
-              }}>
-                <div style={{ fontSize: "10px", color: "var(--faint)", marginBottom: "4px" }}>{label}</div>
-                <div style={{ fontFamily: "var(--font-data)", fontSize: "17px", fontWeight: 600, color }}>{value}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Engine activity log */}
-          <div style={{
-            flex: 1, background: "#0A0D14", borderRadius: "5px",
-            padding: "8px 10px", border: "1px solid var(--border)",
-            maxHeight: "160px", overflowY: "auto",
-            fontFamily: "var(--font-data)", fontSize: "11px",
-          }}>
-            <div style={{ color: "var(--faint)", marginBottom: "6px", fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Engine log
-            </div>
-            {autoScaleLog.length === 0 ? (
-              <span style={{ color: "var(--faint)" }}>Initializing…</span>
-            ) : autoScaleLog.map((e, i) => (
-              <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "3px" }}>
-                <span style={{ color: "var(--faint)", flexShrink: 0 }}>{e.time}</span>
-                <span style={{ color: e.type === "success" ? "var(--success)" : e.type === "warning" ? "var(--warning)" : "var(--faint)" }}>
-                  {e.message}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <LiveChart data={metricHistory} keys={["cpu", "memory", "network", "latency"]} kind="area" height={260} />
       </section>
 
-      {/* ─── Quick-Launch Stress Commands ─── */}
+      {/* Load Test & Stress Commands */}
       <section className="stress-panel">
         <div className="section-head" style={{ marginBottom: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-            <TerminalSquare size={15} style={{ color: "var(--warning)" }} />
-            <h2>Quick-Launch Load Test</h2>
+            <TerminalSquare size={15} style={{ color: "var(--primary)" }} />
+            <h2>AWS EC2 Load & Stress Commands</h2>
           </div>
           <a
             href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
@@ -354,7 +196,7 @@ export default function DashboardPage() {
           </a>
         </div>
         <p style={{ margin: "0 0 10px", fontSize: "11px", color: "var(--faint)" }}>
-          Copy any command below → paste into your EC2 SSH session → watch the Auto-Scale Engine trigger above.
+          Copy any command below, paste into your EC2 terminal session, and monitor live telemetry above.
         </p>
         {STRESS_CMDS.map((cmd) => (
           <div key={cmd.id} className="stress-cmd">
@@ -369,7 +211,7 @@ export default function DashboardPage() {
               href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
               target="_blank"
               rel="noopener noreferrer"
-              title="Open EC2 to SSH"
+              title="Open EC2 Console"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: "28px", height: "28px", borderRadius: "4px",
@@ -383,12 +225,12 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      {/* Scaling decisions table */}
+      {/* Recent Scaling Decisions Table */}
       <section className="panel" style={{ marginTop: "2px" }}>
         <div className="section-head" style={{ marginBottom: "10px" }}>
           <div>
-            <h2>Recent scaling decisions</h2>
-            <p style={{ marginTop: "2px", fontSize: "11px" }}>Executed by the Auto-Scale Engine or manual operator overrides.</p>
+            <h2>Recent Scaling Decisions</h2>
+            <p style={{ marginTop: "2px", fontSize: "11px" }}>Executed by auto-scaling policies or operator overrides.</p>
           </div>
         </div>
         <DataTable

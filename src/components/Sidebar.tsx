@@ -12,7 +12,6 @@ import {
   Gauge,
   LayoutDashboard,
   Server,
-  Settings,
   SlidersHorizontal,
   Users,
 } from "lucide-react";
@@ -54,7 +53,6 @@ const navGroups = [
     items: [
       { href: "/audit", label: "Audit", icon: FileClock, area: "audit" },
       { href: "/users", label: "Users", icon: Users, area: "users" },
-      { href: "/settings", label: "Settings", icon: Settings, area: "settings" },
     ],
   },
 ];

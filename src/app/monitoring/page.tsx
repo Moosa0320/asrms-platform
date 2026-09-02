@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, Wifi, WifiOff, ExternalLink, Copy, Check, Server, Zap } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff, ExternalLink, Copy, Check, TerminalSquare } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { LiveChart } from "@/components/LiveChart";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -12,6 +12,7 @@ interface MonitoringSnapshot extends MetricPoint {
   resourceId?: string;
   source?: string;
   instanceId?: string;
+  state?: string;
 }
 
 export default function MonitoringPage() {
@@ -21,11 +22,10 @@ export default function MonitoringPage() {
   const [isLive, setIsLive] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // AWS-Only Monitorable Resources
   const awsResources = [
     {
       id: "aws-ec2-t3-micro",
-      name: "AWS EC2 t3.micro Instance (us-east-1 Live)",
+      name: "AWS EC2 t3.micro (us-east-1)",
       type: "vm",
       cloudProvider: "aws",
       region: "us-east-1",
@@ -37,19 +37,29 @@ export default function MonitoringPage() {
 
   const stressCommands = [
     {
-      title: "🐍 Python 3 Live Stress Test (60s Auto-Timer with Progress)",
-      command: `python3 -c "import time; print('🔥 400MB RAM & 100% CPU Stress Started...'); d='X'*(400*1024*1024); t=time.time()+60\nwhile time.time()<t:\n  sum(i*i for i in range(1000000))\n  print(f'⚡ Stressing: {int(t-time.time())}s remaining', end='\\r', flush=True)\nprint('\\n✓ Completed!')"`,
-      description: "Allocates 400MB RAM and drives CPU to 100% with a live second-by-second countdown. Auto-stops after 60s.",
+      title: "CPU Load (All Cores, 60 Seconds)",
+      command: "for i in $(seq 1 $(nproc)); do yes > /dev/null & done; sleep 60; killall yes",
+      description: "Spawns parallel yes processes on all CPU cores and auto-terminates after 60s.",
     },
     {
-      title: "⚡ Standard Linux Stress Utility (5-Minute Run)",
-      command: `sudo apt update && sudo apt install -y stress && stress --cpu 2 --vm 1 --vm-bytes 300M --timeout 300s`,
-      description: "Official Linux stress utility. Runs 100% CPU & 300MB RAM load for 5 minutes and exits automatically.",
+      title: "CPU + Memory Stress (Python3, 60 Seconds)",
+      command: `python3 -c "import time; data = bytearray(300 * 1024 * 1024); t = time.time() + 60; [i*i for i in range(100000000) if time.time() < t]"`,
+      description: "Allocates 300MB RAM and runs continuous floating-point calculations for 60s.",
     },
     {
-      title: "🔥 Quick Background 1-Core CPU Loop",
-      command: `timeout 300 bash -c 'while true; do :; done' &`,
-      description: "Runs 50% CPU in the background for 5 minutes. Stop anytime with 'killall bash'.",
+      title: "Linux Stress Utility (60 Seconds)",
+      command: "sudo apt update && sudo apt install -y stress 2>/dev/null || sudo yum install -y stress 2>/dev/null; stress --cpu 2 --vm 1 --vm-bytes 256M --timeout 60s",
+      description: "Executes standard stress utility for 2 CPU workers and 256MB memory.",
+    },
+    {
+      title: "Background Infinite CPU Loop",
+      command: "while true; do :; done &",
+      description: "Runs infinite while loop in background. Stop with: pkill -f 'while true'",
+    },
+    {
+      title: "Terminate All Stress Processes",
+      command: "killall yes 2>/dev/null; pkill -f 'while true' 2>/dev/null; pkill -f python3 2>/dev/null; killall stress 2>/dev/null",
+      description: "Kills all background yes, python, while loops, and stress utility processes.",
     },
   ];
 
@@ -97,41 +107,40 @@ export default function MonitoringPage() {
           <h1>Realtime AWS Cloud Monitoring</h1>
           <p>
             {lastSnapshot?.source
-              ? `Source: ${lastSnapshot.source}${lastSnapshot.instanceId ? ` (Target: ${lastSnapshot.instanceId})` : ""}`
+              ? `Source: ${lastSnapshot.source}`
               : "Connecting to AWS CloudWatch..."}
           </p>
         </div>
         <div className="segmented" style={{ alignItems: "center", gap: "10px" }}>
-          {/* Live Status Badge */}
           <span
             style={{
               display: "flex",
               alignItems: "center",
               gap: "6px",
               padding: "4px 10px",
-              borderRadius: "6px",
+              borderRadius: "5px",
               fontSize: "12px",
-              fontWeight: 600,
-              background: isLive ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.10)",
+              fontFamily: "var(--font-data)",
+              background: isLive ? "rgba(74,222,128,0.1)" : "rgba(251,191,36,0.1)",
               color: isLive ? "var(--success)" : "var(--warning)",
-              border: `1px solid ${isLive ? "rgba(34,197,94,0.3)" : "rgba(245,158,11,0.3)"}`,
+              border: `1px solid ${isLive ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}`,
             }}
           >
             {isLive ? <Wifi size={13} /> : <WifiOff size={13} />}
             {lastSnapshot?.source?.includes("AWS") ? "Live AWS" : "Connecting"}
           </span>
 
-          {/* AWS-Only Dropdown */}
           <select
             value={selectedResource}
             onChange={(e) => setSelectedResource(e.target.value)}
             style={{
               padding: "6px 10px",
-              borderRadius: "6px",
+              borderRadius: "5px",
               border: "1px solid var(--line)",
-              background: "#0d1424",
-              color: "var(--foreground)",
-              fontSize: "13px",
+              background: "#0E1118",
+              color: "var(--text)",
+              fontSize: "12px",
+              fontFamily: "var(--font-data)",
             }}
           >
             {awsResources.map((r) => (
@@ -141,141 +150,136 @@ export default function MonitoringPage() {
             ))}
           </select>
 
-          {/* Direct AWS EC2 Connect Link */}
           <a
-            href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:"
+            href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
             target="_blank"
             rel="noreferrer"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "6px 12px",
-              borderRadius: "6px",
-              background: "linear-gradient(135deg, #ff9900, #e68a00)",
-              color: "#000",
-              fontWeight: 600,
-              fontSize: "13px",
-              textDecoration: "none",
-            }}
+            className="button"
+            style={{ fontSize: "12px" }}
           >
-            <ExternalLink size={14} /> Open AWS Console
+            <ExternalLink size={13} /> Open AWS Console
           </a>
 
           <ActionButton action="refresh-monitoring">
-            <RefreshCw size={16} /> Refresh
+            <RefreshCw size={14} /> Refresh
           </ActionButton>
         </div>
       </header>
 
       {/* KPI Metric Cards */}
-      <section className="grid kpis" style={{ marginBottom: "20px" }}>
+      <section className="grid kpis">
         <div className="panel" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: cpuVal > 80 ? "var(--critical)" : cpuVal > 60 ? "var(--warning)" : "var(--success)" }}>
+          <div style={{ fontFamily: "var(--font-data)", fontSize: "24px", fontWeight: 600, color: cpuVal > 80 ? "var(--critical)" : cpuVal > 60 ? "var(--warning)" : "var(--success)" }}>
             {cpuVal}%
           </div>
-          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>CPU Utilization (AWS)</div>
+          <div style={{ fontSize: "11px", color: "var(--faint)", marginTop: "4px" }}>CPU Utilization</div>
         </div>
         <div className="panel" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: memVal > 85 ? "var(--critical)" : memVal > 70 ? "var(--warning)" : "var(--success)" }}>
+          <div style={{ fontFamily: "var(--font-data)", fontSize: "24px", fontWeight: 600, color: memVal > 85 ? "var(--critical)" : memVal > 70 ? "var(--warning)" : "var(--success)" }}>
             {memVal}%
           </div>
-          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>Memory Footprint</div>
+          <div style={{ fontSize: "11px", color: "var(--faint)", marginTop: "4px" }}>Memory Footprint</div>
         </div>
         <div className="panel" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--primary)" }}>
-            {netVal} <span style={{ fontSize: "1rem" }}>Kbps</span>
+          <div style={{ fontFamily: "var(--font-data)", fontSize: "24px", fontWeight: 600, color: "var(--primary)" }}>
+            {netVal} <span style={{ fontSize: "12px" }}>Kbps</span>
           </div>
-          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>Cloud Throughput</div>
+          <div style={{ fontSize: "11px", color: "var(--faint)", marginTop: "4px" }}>Throughput</div>
         </div>
         <div className="panel" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: latVal > 100 ? "var(--warning)" : "var(--success)" }}>
-            {latVal} <span style={{ fontSize: "1rem" }}>ms</span>
+          <div style={{ fontFamily: "var(--font-data)", fontSize: "24px", fontWeight: 600, color: latVal > 100 ? "var(--warning)" : "var(--success)" }}>
+            {latVal} <span style={{ fontSize: "12px" }}>ms</span>
           </div>
-          <div style={{ fontSize: "12px", color: "var(--faint)", marginTop: "4px" }}>AWS Latency</div>
+          <div style={{ fontSize: "11px", color: "var(--faint)", marginTop: "4px" }}>AWS Latency</div>
         </div>
       </section>
 
       {/* Live Chart Stream */}
-      <section className="panel" style={{ marginBottom: "20px" }}>
-        <div className="section-head">
-          <h2>AWS Live Metric Stream</h2>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <StatusBadge value="active" />
-            {lastSnapshot?.instanceId && (
-              <span style={{ fontSize: "11px", color: "var(--faint)" }}>
-                Target Instance: {lastSnapshot.instanceId}
-              </span>
-            )}
-            <span style={{ fontSize: "11px", color: "var(--faint)" }}>
+      <section className="panel">
+        <div className="section-head" style={{ marginBottom: "12px" }}>
+          <div>
+            <h2>AWS Live Metric Stream</h2>
+            <p style={{ marginTop: "2px", fontSize: "11px" }}>
               {lastSnapshot?.source ?? ""}
-            </span>
+            </p>
           </div>
+          <StatusBadge value={lastSnapshot?.state === "stopped" ? "inactive" : "active"} />
         </div>
-        <LiveChart data={points} keys={["cpu", "memory", "network", "latency"]} />
+        <LiveChart data={points} keys={["cpu", "memory", "network", "latency"]} height={280} />
       </section>
 
-      {/* Direct AWS Stress & Load Commands Helper Panel */}
-      <section className="panel">
-        <div className="section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Zap style={{ color: "#ff9900" }} size={20} />
-            <h2>Direct AWS Load & Stress Commands</h2>
+      {/* AWS Stress & Load Commands */}
+      <section className="stress-panel">
+        <div className="section-head" style={{ marginBottom: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+            <TerminalSquare size={15} style={{ color: "var(--primary)" }} />
+            <h2>AWS EC2 Load & Stress Commands</h2>
           </div>
-          <p>Copy any command below, click "Open AWS Console" above, connect via EC2 Instance Connect, and paste to test real-world CPU/Memory scaling!</p>
+          <a
+            href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ghost-button"
+            style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px" }}
+          >
+            <ExternalLink size={12} /> Open AWS EC2 Console
+          </a>
         </div>
+        <p style={{ margin: "0 0 10px", fontSize: "11px", color: "var(--faint)" }}>
+          Copy any command below, paste into your EC2 SSH session, and monitor live metrics.
+        </p>
 
-        <div style={{ display: "grid", gap: "12px", marginTop: "14px" }}>
-          {stressCommands.map((item, idx) => (
-            <div
-              key={idx}
+        {stressCommands.map((item, idx) => (
+          <div key={idx} className="stress-cmd">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "var(--font-data)", fontSize: "11px", color: "var(--text)", marginBottom: "2px" }}>
+                {item.title}
+              </div>
+              <code style={{ fontSize: "10px", color: "var(--faint)" }}>{item.description}</code>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(item.command, idx)}
               style={{
-                background: "#080c14",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "8px",
-                padding: "14px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                background: copiedIndex === idx ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${copiedIndex === idx ? "rgba(74,222,128,0.3)" : "var(--border)"}`,
+                color: copiedIndex === idx ? "var(--success)" : "var(--muted)",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontFamily: "var(--font-data)",
+                transition: "all 0.15s",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <span style={{ fontWeight: 600, color: "#f3f4f6", fontSize: "13px" }}>{item.title}</span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(item.command, idx)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    padding: "4px 10px",
-                    borderRadius: "4px",
-                    background: copiedIndex === idx ? "rgba(34, 197, 94, 0.2)" : "rgba(255,255,255,0.08)",
-                    color: copiedIndex === idx ? "#4ade80" : "#9ca3af",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                  }}
-                >
-                  {copiedIndex === idx ? <Check size={13} /> : <Copy size={13} />}
-                  {copiedIndex === idx ? "Copied!" : "Copy Command"}
-                </button>
-              </div>
-              <p style={{ fontSize: "12px", color: "var(--faint)", margin: "0 0 8px 0" }}>{item.description}</p>
-              <code
-                style={{
-                  display: "block",
-                  background: "#05080f",
-                  padding: "10px 12px",
-                  borderRadius: "6px",
-                  color: "#38bdf8",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "12px",
-                  wordBreak: "break-all",
-                }}
-              >
-                {item.command}
-              </code>
-            </div>
-          ))}
-        </div>
+              {copiedIndex === idx ? <Check size={12} /> : <Copy size={12} />}
+              {copiedIndex === idx ? "Copied" : "Copy"}
+            </button>
+            <a
+              href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open EC2 Console"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "28px",
+                height: "28px",
+                borderRadius: "4px",
+                border: "1px solid var(--border)",
+                color: "var(--faint)",
+                background: "rgba(255,255,255,0.03)",
+                flexShrink: 0,
+              }}
+            >
+              <ExternalLink size={11} />
+            </a>
+          </div>
+        ))}
       </section>
     </div>
   );
