@@ -49,17 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("asrms-session");
-    if (saved) {
-      try {
-        setUser(JSON.parse(saved));
-      } catch (e) {
-        window.localStorage.removeItem("asrms-session");
-      }
-    }
-    
     let unsubFirestore: (() => void) | null = null;
-    
+
     const unsubscribe = subscribeToAuth((firebaseUser) => {
       if (unsubFirestore) {
         unsubFirestore();
@@ -86,23 +77,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         }
       } else {
-        if (isFirebaseConfigured) {
-          // Firebase is configured: if Firebase Auth says no user is logged in, clear stale mock session
-          setUser(null);
-          window.localStorage.removeItem("asrms-session");
-        } else {
-          const savedSession = window.localStorage.getItem("asrms-session");
-          if (!savedSession) {
-            setUser(null);
-          }
-        }
+        // No authenticated Firebase session -> clear user completely
+        setUser(null);
+        window.localStorage.removeItem("asrms-session");
       }
       setLoading(false);
     });
-    
+
     // Safety fallback: ensure loading screen NEVER hangs indefinitely
     const timer = setTimeout(() => setLoading(false), 1500);
-    
+
     return () => {
       clearTimeout(timer);
       unsubscribe();

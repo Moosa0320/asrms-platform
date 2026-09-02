@@ -18,6 +18,11 @@ function ShellInner({ children }: { children: ReactNode }) {
     return <div className="boot-screen">Initializing ASRMS control plane...</div>;
   }
 
+  // STRICT AUTH: Only authenticated users who are signed in can access the platform!
+  if (!user) {
+    return null;
+  }
+
   if (user?.role === "pending") {
     return (
       <main className="login-page">
