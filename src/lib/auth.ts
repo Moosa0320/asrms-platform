@@ -42,10 +42,10 @@ export async function signIn(identifier: string, password: string): Promise<Sess
   }
 
   const cred = await signInWithEmailAndPassword(auth, email, password);
-  const role = await fetchUserRole(cred.user.uid, cred.user.email || email);
+  const isSuperAdmin = (cred.user.email || email).toLowerCase() === SUPER_ADMIN_EMAIL;
 
   // Ensure the super admin doc exists in Firestore
-  if (role === "super_admin") {
+  if (isSuperAdmin) {
     const userDoc = await getDoc(doc(db, "users", cred.user.uid));
     if (!userDoc.exists()) {
       await setDoc(doc(db, "users", cred.user.uid), {
@@ -58,7 +58,23 @@ export async function signIn(identifier: string, password: string): Promise<Sess
     } else if (userDoc.data().role !== "super_admin") {
       await setDoc(doc(db, "users", cred.user.uid), { role: "super_admin" }, { merge: true });
     }
+  } else {
+    // Non-super-admin: must have a Firestore user document (i.e. registered via ASRMS)
+    const userDoc = await getDoc(doc(db, "users", cred.user.uid));
+    if (!userDoc.exists()) {
+      // Sign the user back out so they don't hold a Firebase Auth session
+      await firebaseSignOut(auth);
+      throw new Error("No ASRMS account found. Please sign up first or contact your administrator.");
+    }
+
+    const data = userDoc.data();
+    if (data.status === "disabled") {
+      await firebaseSignOut(auth);
+      throw new Error("Your account has been disabled. Contact your administrator.");
+    }
   }
+
+  const role = await fetchUserRole(cred.user.uid, cred.user.email || email);
 
   return {
     uid: cred.user.uid,
