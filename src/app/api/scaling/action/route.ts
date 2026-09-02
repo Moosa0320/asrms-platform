@@ -30,12 +30,16 @@ export async function POST(request: Request) {
     }
 
     const region = process.env.AWS_REGION || 'us-east-1';
-    const ec2 = new EC2Client({ region });
+    const credentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    };
+    const ec2 = new EC2Client({ region, credentials });
 
     // Discover target EC2 instance
     const listRes = await ec2.send(
       new DescribeInstancesCommand({
-        Filters: [{ Name: 'instance-state-name', Values: ['running', 'stopped'] }],
+        Filters: [{ Name: 'instance-state-name', Values: ['running', 'stopped', 'pending', 'stopping'] }],
       })
     );
 
@@ -75,7 +79,7 @@ export async function POST(request: Request) {
     console.error('[AWS Scaling Action] Error:', err);
     let errMsg = err.message || 'AWS Action Failed';
     if (err.name === 'UnauthorizedOperation' || errMsg.includes('is not authorized')) {
-      errMsg = `AWS IAM Permission Required: Your AWS IAM user 'asrms' needs 'AmazonEC2FullAccess' (or ec2:StartInstances/StopInstances/RebootInstances permissions) attached in the AWS IAM Console to execute live EC2 power commands.`;
+      errMsg = `AWS IAM Permission Required: Your AWS IAM user 'asrms' needs 'AmazonEC2FullAccess' attached in the AWS IAM Console to execute live EC2 power commands.`;
     }
     return NextResponse.json({ error: errMsg }, { status: 500 });
   }

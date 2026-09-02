@@ -3,9 +3,8 @@ import {
   EC2Client,
   DescribeInstancesCommand,
   StartInstancesCommand,
-  RebootInstancesCommand,
 } from '@aws-sdk/client-ec2';
-import { CloudWatchClient, GetMetricDataCommand } from '@aws-sdk/client-cloudwatch';
+import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cloudwatch';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,72 +14,76 @@ const COOLDOWN_MS = 60 * 1000; // 60 seconds cooldown between automated scale tr
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const forcedCpu = body.cpu;
     const threshold = body.threshold || 70;
 
     const region = process.env.AWS_REGION || 'us-east-1';
-    let instanceId = 'i-02720bd65ad532385';
-    let currentCpu = typeof forcedCpu === 'number' ? forcedCpu : 12;
+    const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY ? {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    } : undefined;
 
-    // Discover live EC2 instance & fetch CPU from CloudWatch if AWS keys configured
+    let instanceId = 'i-02720bd65ad532385';
+    let instanceState = 'running';
+    let currentCpu = 0;
+
     if (process.env.AWS_ACCESS_KEY_ID) {
       try {
-        const ec2 = new EC2Client({ region });
+        const ec2 = new EC2Client({ region, credentials });
         const listRes = await ec2.send(
           new DescribeInstancesCommand({
-            Filters: [{ Name: 'instance-state-name', Values: ['running', 'stopped'] }],
+            Filters: [{ Name: 'instance-state-name', Values: ['running', 'stopped', 'pending', 'stopping'] }],
           })
         );
-        const instance = listRes.Reservations?.[0]?.Instances?.[0];
-        if (instance?.InstanceId) {
-          instanceId = instance.InstanceId;
+        const found = listRes.Reservations?.[0]?.Instances?.[0];
+        if (found?.InstanceId) {
+          instanceId = found.InstanceId;
+          instanceState = found.State?.Name || 'running';
         }
 
-        if (typeof forcedCpu !== 'number') {
-          const cw = new CloudWatchClient({ region });
+        if (instanceState === 'stopped') {
+          currentCpu = 0;
+        } else {
+          // Query real CloudWatch
+          const cw = new CloudWatchClient({ region, credentials });
           const endTime = new Date();
-          const startTime = new Date(endTime.getTime() - 15 * 60 * 1000);
+          const startTime = new Date(endTime.getTime() - 2 * 60 * 60 * 1000);
           const metricRes = await cw.send(
-            new GetMetricDataCommand({
+            new GetMetricStatisticsCommand({
+              Namespace: 'AWS/EC2',
+              MetricName: 'CPUUtilization',
+              Dimensions: [{ Name: 'InstanceId', Value: instanceId }],
               StartTime: startTime,
               EndTime: endTime,
-              MetricDataQueries: [
-                {
-                  Id: 'm1',
-                  MetricStat: {
-                    Metric: {
-                      Namespace: 'AWS/EC2',
-                      MetricName: 'CPUUtilization',
-                      Dimensions: [{ Name: 'InstanceId', Value: instanceId }],
-                    },
-                    Period: 300,
-                    Stat: 'Average',
-                  },
-                },
-              ],
+              Period: 300,
+              Statistics: ['Average', 'Maximum'],
             })
           );
-          const vals = metricRes.MetricDataResults?.[0]?.Values || [];
-          if (vals.length > 0) {
-            currentCpu = Math.round(vals[vals.length - 1]);
+          if (metricRes.Datapoints && metricRes.Datapoints.length > 0) {
+            metricRes.Datapoints.sort((a, b) => (b.Timestamp?.getTime() || 0) - (a.Timestamp?.getTime() || 0));
+            const latestPoint = metricRes.Datapoints[0];
+            currentCpu = Math.round(latestPoint.Maximum || latestPoint.Average || 0);
+          } else {
+            currentCpu = 1;
           }
         }
       } catch (e) {
-        console.warn('[AutoScale Engine] Telemetry fetch warning:', e);
+        console.warn('[AutoScale Engine] AWS telemetry fetch warning:', e);
       }
     }
 
     const now = Date.now();
     const inCooldown = now - lastAutoScaleTime < COOLDOWN_MS;
 
-    if (currentCpu >= threshold) {
+    if (currentCpu >= threshold && instanceState === 'running') {
       if (inCooldown) {
         return NextResponse.json({
           triggered: false,
           inCooldown: true,
           cpu: currentCpu,
           threshold,
-          message: `High load (${currentCpu}%) detected, but Auto-Scaler is currently in cooldown (${Math.round((COOLDOWN_MS - (now - lastAutoScaleTime)) / 1000)}s remaining).`,
+          instanceId,
+          state: instanceState,
+          message: `High load (${currentCpu}%) detected on AWS EC2 (${instanceId}), but Auto-Scaler is in cooldown (${Math.round((COOLDOWN_MS - (now - lastAutoScaleTime)) / 1000)}s remaining).`,
         });
       }
 
@@ -105,17 +108,17 @@ export async function POST(request: Request) {
         console.warn('[AutoScale Engine] Notify error:', err);
       }
 
-      // 2. Attempt AWS EC2 Action if IAM permits
+      // 2. Attempt AWS EC2 Scale Action
       let awsActionExecuted = false;
       let awsActionNote = 'Automated scaling policy applied to resource pool.';
       if (process.env.AWS_ACCESS_KEY_ID) {
         try {
-          const ec2 = new EC2Client({ region });
+          const ec2 = new EC2Client({ region, credentials });
           await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
           awsActionExecuted = true;
           awsActionNote = `Successfully scaled AWS EC2 instance ${instanceId}.`;
         } catch (err: any) {
-          awsActionNote = `Decision registered. (AWS Note: ${err.message || 'Check IAM permission'})`;
+          awsActionNote = `Decision registered. (${err.message || 'Check IAM permission'})`;
         }
       }
 
@@ -125,19 +128,23 @@ export async function POST(request: Request) {
         cpu: currentCpu,
         threshold,
         instanceId,
-        message: `⚡ Autonomous Auto-Scaler Triggered! Live CPU reached ${currentCpu}%. Policy 'AWS EC2 Target CPU 70%' executed. Email alert dispatched.`,
+        state: instanceState,
+        message: `⚡ Autonomous Auto-Scaler Triggered! Live AWS CPU reached ${currentCpu}%. Scaling action executed. Email alert dispatched.`,
         awsActionExecuted,
         awsActionNote,
         timestamp: new Date().toLocaleTimeString(),
       });
     }
 
+    const stateDesc = instanceState === 'stopped' ? 'Instance is currently STOPPED' : `CPU ${currentCpu}% is below threshold (${threshold}%)`;
+
     return NextResponse.json({
       triggered: false,
       cpu: currentCpu,
       threshold,
       instanceId,
-      message: `CPU load (${currentCpu}%) is below scaling threshold (${threshold}%). Auto-scaler on standby.`,
+      state: instanceState,
+      message: `AWS EC2 (${instanceId}) [${instanceState.toUpperCase()}]: ${stateDesc}. Auto-scaler on standby.`,
     });
   } catch (error: any) {
     console.error('[Auto-Scale Route Error]:', error);
