@@ -72,11 +72,20 @@ export default function UsersPage() {
       }
     }
 
-    if (confirm(`Are you sure you want to completely remove ${targetUser.displayName} (${targetUser.email}) from the system?`)) {
+    if (confirm(`Are you sure you want to permanently delete ${targetUser.displayName} (${targetUser.email}) from the system? This cannot be undone.`)) {
       try {
-        await removeUser(targetUser.uid);
+        const res = await fetch(`/api/users/${targetUser.uid}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestingUid: currentUser?.uid }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(`Failed to remove user: ${data.error || "Unknown error"}`);
+        }
       } catch (err) {
         console.error("Failed to remove user:", err);
+        alert("An unexpected error occurred while removing the user.");
       }
     }
   }

@@ -249,11 +249,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const removePolicy = (id: string) => setPolicies((prev) => prev.filter(p => p.id !== id));
   const removeProvider = (id: string) => setCloudProviders((prev) => prev.filter(p => p.id !== id));
   const removeUser = async (uid: string) => {
-    if (isFirebaseConfigured && db) {
-      const { deleteRecord } = await import("@/lib/firestore");
-      await deleteRecord("users", uid);
-    } else {
-      setUsers((prev) => prev.filter(u => u.uid !== uid));
+    // Call server-side API to delete from BOTH Firebase Auth AND Firestore
+    const res = await fetch(`/api/users/${uid}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestingUid: uid }), // will be overridden in users page
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to delete user.");
     }
   };
   const removeAuditLog = (id: string) => setAuditLogs((prev) => prev.filter(l => l.id !== id));

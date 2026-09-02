@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Zap, Power, Server } from "lucide-react";
+import { Play, Zap, Power, Server, RotateCw, Lock } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
 import { MetricCard } from "@/components/MetricCard";
@@ -101,64 +101,87 @@ export default function ScalingPage() {
             Issue real-time Start, Stop, or Reboot commands directly to your connected AWS EC2 instance.
           </p>
 
-          {actionFeedback?.message && (
-            <div style={{ padding: "10px 14px", borderRadius: "6px", background: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#4ade80", fontSize: "13px", marginBottom: "14px" }}>
-              ✓ {actionFeedback.message}
+          {(role === "viewer" || role === "pending" || role === "developer") ? (
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "12px",
+              padding: "40px 20px",
+              border: "1px dashed var(--line)",
+              borderRadius: "8px",
+              textAlign: "center",
+              color: "var(--faint)",
+            }}>
+              <Lock size={28} style={{ opacity: 0.4 }} />
+              <div>
+                <p style={{ fontWeight: 600, marginBottom: "4px", color: "var(--foreground)" }}>Access restricted</p>
+                <p style={{ fontSize: "12px" }}>Only Operators, Admins, and Super Admins can execute AWS scaling commands.</p>
+              </div>
             </div>
+          ) : (
+            <>
+              {actionFeedback?.message && (
+                <div style={{ padding: "10px 14px", borderRadius: "6px", background: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#4ade80", fontSize: "13px", marginBottom: "14px" }}>
+                  ✓ {actionFeedback.message}
+                </div>
+              )}
+
+              {actionFeedback?.error && (
+                <div style={{ padding: "10px 14px", borderRadius: "6px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "13px", marginBottom: "14px" }}>
+                  ⚠ {actionFeedback.error}
+                </div>
+              )}
+
+              <form onSubmit={handleScalingSubmit} className="form-grid">
+                <label className="field span-2">
+                  Target AWS Resource
+                  <select disabled>
+                    <option>AWS EC2 t3.micro (us-east-1) - Connected</option>
+                  </select>
+                </label>
+
+                <label className="field span-2">
+                  Scaling Command Action
+                  <select value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)}>
+                    <option value="start">▶ Start EC2 Instance (Scale Up / Boot)</option>
+                    <option value="stop">⏹ Stop EC2 Instance (Scale Down / Power Off)</option>
+                    <option value="reboot">🔄 Reboot EC2 Instance (Restart Service)</option>
+                  </select>
+                </label>
+
+                <label className="field span-2">
+                  Operator Reason
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={2}
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={loadingAction}
+                  className="button span-2"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    background: "linear-gradient(135deg, #ff9900, #e68a00)",
+                    color: "#000",
+                    padding: "12px",
+                    fontWeight: 700,
+                    borderRadius: "8px",
+                  }}
+                >
+                  {loadingAction ? <RotateCw size={16} className="spin" /> : <Zap size={16} />}
+                  {loadingAction ? "Dispatching to AWS..." : "Execute AWS Action"}
+                </button>
+              </form>
+            </>
           )}
-
-          {actionFeedback?.error && (
-            <div style={{ padding: "10px 14px", borderRadius: "6px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "13px", marginBottom: "14px" }}>
-              ⚠ {actionFeedback.error}
-            </div>
-          )}
-
-          <form onSubmit={handleScalingSubmit} className="form-grid">
-            <label className="field span-2">
-              Target AWS Resource
-              <select disabled>
-                <option>AWS EC2 t3.micro (us-east-1) - Connected</option>
-              </select>
-            </label>
-
-            <label className="field span-2">
-              Scaling Command Action
-              <select value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)}>
-                <option value="start">▶ Start EC2 Instance (Scale Up / Boot)</option>
-                <option value="stop">⏹ Stop EC2 Instance (Scale Down / Power Off)</option>
-                <option value="reboot">🔄 Reboot EC2 Instance (Restart Service)</option>
-              </select>
-            </label>
-
-            <label className="field span-2">
-              Operator Reason
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={2}
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={loadingAction}
-              className="button span-2"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                background: "linear-gradient(135deg, #ff9900, #e68a00)",
-                color: "#000",
-                padding: "12px",
-                fontWeight: 700,
-                borderRadius: "8px",
-              }}
-            >
-              {loadingAction ? <RotateCw size={16} className="spin" /> : <Zap size={16} />}
-              {loadingAction ? "Dispatching to AWS..." : "Execute AWS Action"}
-            </button>
-          </form>
         </div>
       </section>
     </div>
