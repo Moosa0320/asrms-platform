@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity, Bell, Clipboard, ClipboardCheck, Cpu, Database,
-  Download, ExternalLink, Gauge, Plus, TerminalSquare,
+  Download, ExternalLink, Gauge, Plus, Power, TerminalSquare,
 } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
@@ -44,6 +44,40 @@ const STRESS_CMDS = [
     label: "Terminate All Active Stress Processes",
     description: "Immediately kills all background yes, python, while loops, and stress processes.",
     cmd: "killall yes 2>/dev/null; pkill -f 'while true' 2>/dev/null; pkill -f python3 2>/dev/null; killall stress 2>/dev/null",
+  },
+];
+
+// ─── Manual Instance Start/Stop Commands ─────────────────────────────────────
+const POWER_CMDS = [
+  {
+    id: "start-aws-cli",
+    label: "Start EC2 Instance (AWS CLI)",
+    description: "Powers on the stopped EC2 instance via AWS CLI.",
+    cmd: "aws ec2 start-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+  },
+  {
+    id: "stop-aws-cli",
+    label: "Stop EC2 Instance (AWS CLI)",
+    description: "Gracefully powers off the EC2 instance via AWS CLI.",
+    cmd: "aws ec2 stop-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+  },
+  {
+    id: "reboot-aws-cli",
+    label: "Reboot EC2 Instance (AWS CLI)",
+    description: "Performs a clean reboot of the EC2 instance via AWS CLI.",
+    cmd: "aws ec2 reboot-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+  },
+  {
+    id: "status-aws-cli",
+    label: "Check Instance State (AWS CLI)",
+    description: "Queries current status (running, stopped, pending) of the instance.",
+    cmd: 'aws ec2 describe-instances --instance-ids i-02720bd65ad532385 --region us-east-1 --query "Reservations[*].Instances[*].State.Name" --output text',
+  },
+  {
+    id: "shutdown-ssh",
+    label: "Shutdown from Inside SSH Session",
+    description: "Linux system command to shut down the VM directly from the terminal.",
+    cmd: "sudo shutdown -h now",
   },
 ];
 
@@ -109,7 +143,6 @@ export default function DashboardPage() {
   const awsResources = resources.filter((r) => r.cloudProvider === "aws");
   const liveCpu = liveTelemetry?.cpu ?? 0;
   const liveMemory = liveTelemetry?.memory ?? 0;
-  const liveLatency = liveTelemetry?.latency ?? 22;
   const isCpuBreaching = liveCpu >= 70;
   const unreadAlerts = notifications.filter((n) => !n.read).length;
 
@@ -199,6 +232,47 @@ export default function DashboardPage() {
           Copy any command below, paste into your EC2 terminal session, and monitor live telemetry above.
         </p>
         {STRESS_CMDS.map((cmd) => (
+          <div key={cmd.id} className="stress-cmd">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "var(--font-data)", fontSize: "11px", color: "var(--text)", marginBottom: "2px" }}>
+                {cmd.label}
+              </div>
+              <code style={{ fontSize: "10px", color: "var(--faint)" }}>{cmd.description}</code>
+            </div>
+            <CopyButton text={cmd.cmd} />
+            <a
+              href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open EC2 Console"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: "28px", height: "28px", borderRadius: "4px",
+                border: "1px solid var(--border)", color: "var(--faint)",
+                background: "rgba(255,255,255,0.03)", flexShrink: 0,
+              }}
+            >
+              <ExternalLink size={11} />
+            </a>
+          </div>
+        ))}
+      </section>
+
+      {/* Manual Start / Stop / Reboot Power Commands */}
+      <section className="stress-panel" style={{ borderTop: "2px solid var(--primary)" }}>
+        <div className="section-head" style={{ marginBottom: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+            <Power size={15} style={{ color: "var(--primary)" }} />
+            <h2>Manual Start & Stop Commands (AWS CLI & SSH)</h2>
+          </div>
+          <span style={{ fontSize: "11px", fontFamily: "var(--font-data)", color: "var(--faint)" }}>
+            Instance: i-02720bd65ad532385
+          </span>
+        </div>
+        <p style={{ margin: "0 0 10px", fontSize: "11px", color: "var(--faint)" }}>
+          Run these commands in your local terminal (with AWS CLI configured) or inside SSH to manually control the EC2 instance power state.
+        </p>
+        {POWER_CMDS.map((cmd) => (
           <div key={cmd.id} className="stress-cmd">
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: "var(--font-data)", fontSize: "11px", color: "var(--text)", marginBottom: "2px" }}>

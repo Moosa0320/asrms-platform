@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, Wifi, WifiOff, ExternalLink, Copy, Check, TerminalSquare } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff, ExternalLink, Copy, Check, Power, TerminalSquare } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { LiveChart } from "@/components/LiveChart";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -20,7 +20,7 @@ export default function MonitoringPage() {
   const [points, setPoints] = useState<MonitoringSnapshot[]>([]);
   const [lastSnapshot, setLastSnapshot] = useState<MonitoringSnapshot | null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
 
   const awsResources = [
     {
@@ -37,29 +37,67 @@ export default function MonitoringPage() {
 
   const stressCommands = [
     {
+      id: "cpu-60s",
       title: "CPU Load (All Cores, 60 Seconds)",
       command: "for i in $(seq 1 $(nproc)); do yes > /dev/null & done; sleep 60; killall yes",
       description: "Spawns parallel yes processes on all CPU cores and auto-terminates after 60s.",
     },
     {
+      id: "cpu-mem-60s",
       title: "CPU + Memory Stress (Python3, 60 Seconds)",
       command: `python3 -c "import time; data = bytearray(300 * 1024 * 1024); t = time.time() + 60; [i*i for i in range(100000000) if time.time() < t]"`,
       description: "Allocates 300MB RAM and runs continuous floating-point calculations for 60s.",
     },
     {
+      id: "stress-pkg",
       title: "Linux Stress Utility (60 Seconds)",
       command: "sudo apt update && sudo apt install -y stress 2>/dev/null || sudo yum install -y stress 2>/dev/null; stress --cpu 2 --vm 1 --vm-bytes 256M --timeout 60s",
       description: "Executes standard stress utility for 2 CPU workers and 256MB memory.",
     },
     {
+      id: "bg-loop",
       title: "Background Infinite CPU Loop",
       command: "while true; do :; done &",
       description: "Runs infinite while loop in background. Stop with: pkill -f 'while true'",
     },
     {
+      id: "stop-all",
       title: "Terminate All Stress Processes",
       command: "killall yes 2>/dev/null; pkill -f 'while true' 2>/dev/null; pkill -f python3 2>/dev/null; killall stress 2>/dev/null",
       description: "Kills all background yes, python, while loops, and stress utility processes.",
+    },
+  ];
+
+  const powerCommands = [
+    {
+      id: "start-aws-cli",
+      title: "Start EC2 Instance (AWS CLI)",
+      command: "aws ec2 start-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+      description: "Powers on the stopped EC2 instance via AWS CLI.",
+    },
+    {
+      id: "stop-aws-cli",
+      title: "Stop EC2 Instance (AWS CLI)",
+      command: "aws ec2 stop-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+      description: "Gracefully powers off the EC2 instance via AWS CLI.",
+    },
+    {
+      id: "reboot-aws-cli",
+      title: "Reboot EC2 Instance (AWS CLI)",
+      command: "aws ec2 reboot-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+      description: "Performs a clean reboot of the EC2 instance via AWS CLI.",
+    },
+    {
+      id: "status-aws-cli",
+      title: "Check Instance State (AWS CLI)",
+      command: 'aws ec2 describe-instances --instance-ids i-02720bd65ad532385 --region us-east-1 --query "Reservations[*].Instances[*].State.Name" --output text',
+      description: "Queries current status (running, stopped, pending) of the instance.",
+    },
+    {
+      id: "shutdown-ssh",
+      title: "Shutdown from Inside SSH Session",
+      command: "sudo shutdown -h now",
+      description: "Linux system command to shut down the VM directly from the terminal.",
     },
   ];
 
@@ -89,9 +127,9 @@ export default function MonitoringPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedResource]);
 
-  const copyToClipboard = (text: string, index: number) => {
+  const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
+    setCopiedIndex(id);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
@@ -229,8 +267,8 @@ export default function MonitoringPage() {
           Copy any command below, paste into your EC2 SSH session, and monitor live metrics.
         </p>
 
-        {stressCommands.map((item, idx) => (
-          <div key={idx} className="stress-cmd">
+        {stressCommands.map((item) => (
+          <div key={item.id} className="stress-cmd">
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: "var(--font-data)", fontSize: "11px", color: "var(--text)", marginBottom: "2px" }}>
                 {item.title}
@@ -239,24 +277,92 @@ export default function MonitoringPage() {
             </div>
             <button
               type="button"
-              onClick={() => copyToClipboard(item.command, idx)}
+              onClick={() => copyToClipboard(item.command, item.id)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "4px",
                 padding: "4px 8px",
                 borderRadius: "4px",
-                background: copiedIndex === idx ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${copiedIndex === idx ? "rgba(74,222,128,0.3)" : "var(--border)"}`,
-                color: copiedIndex === idx ? "var(--success)" : "var(--muted)",
+                background: copiedIndex === item.id ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${copiedIndex === item.id ? "rgba(74,222,128,0.3)" : "var(--border)"}`,
+                color: copiedIndex === item.id ? "var(--success)" : "var(--muted)",
                 cursor: "pointer",
                 fontSize: "11px",
                 fontFamily: "var(--font-data)",
                 transition: "all 0.15s",
               }}
             >
-              {copiedIndex === idx ? <Check size={12} /> : <Copy size={12} />}
-              {copiedIndex === idx ? "Copied" : "Copy"}
+              {copiedIndex === item.id ? <Check size={12} /> : <Copy size={12} />}
+              {copiedIndex === item.id ? "Copied" : "Copy"}
+            </button>
+            <a
+              href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open EC2 Console"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "28px",
+                height: "28px",
+                borderRadius: "4px",
+                border: "1px solid var(--border)",
+                color: "var(--faint)",
+                background: "rgba(255,255,255,0.03)",
+                flexShrink: 0,
+              }}
+            >
+              <ExternalLink size={11} />
+            </a>
+          </div>
+        ))}
+      </section>
+
+      {/* Manual Instance Power Commands */}
+      <section className="stress-panel" style={{ borderTop: "2px solid var(--primary)" }}>
+        <div className="section-head" style={{ marginBottom: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+            <Power size={15} style={{ color: "var(--primary)" }} />
+            <h2>Manual Start & Stop Commands (AWS CLI & SSH)</h2>
+          </div>
+          <span style={{ fontSize: "11px", fontFamily: "var(--font-data)", color: "var(--faint)" }}>
+            Instance: i-02720bd65ad532385
+          </span>
+        </div>
+        <p style={{ margin: "0 0 10px", fontSize: "11px", color: "var(--faint)" }}>
+          Run these commands in your local terminal (with AWS CLI configured) or inside SSH to manually control the EC2 instance power state.
+        </p>
+
+        {powerCommands.map((item) => (
+          <div key={item.id} className="stress-cmd">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "var(--font-data)", fontSize: "11px", color: "var(--text)", marginBottom: "2px" }}>
+                {item.title}
+              </div>
+              <code style={{ fontSize: "10px", color: "var(--faint)" }}>{item.description}</code>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(item.command, item.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                background: copiedIndex === item.id ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${copiedIndex === item.id ? "rgba(74,222,128,0.3)" : "var(--border)"}`,
+                color: copiedIndex === item.id ? "var(--success)" : "var(--muted)",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontFamily: "var(--font-data)",
+                transition: "all 0.15s",
+              }}
+            >
+              {copiedIndex === item.id ? <Check size={12} /> : <Copy size={12} />}
+              {copiedIndex === item.id ? "Copied" : "Copy"}
             </button>
             <a
               href="https://us-east-1.console.aws.amazon.com/ec2/home#Instances"
