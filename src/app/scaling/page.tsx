@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pause, Play, Zap, Power, RotateCw, Server, ShieldCheck } from "lucide-react";
+import { Play, Zap, Power, Server } from "lucide-react";
 import { ActionButton } from "@/components/ActionButton";
 import { DataTable } from "@/components/DataTable";
 import { MetricCard } from "@/components/MetricCard";
@@ -14,7 +14,6 @@ export default function ScalingPage() {
   const { user } = useAuth();
   const role = user?.role || "viewer";
 
-  const [engineActive, setEngineActive] = useState(true);
   const [selectedAction, setSelectedAction] = useState("start");
   const [reason, setReason] = useState("Manual operator override for AWS EC2 instance scaling.");
   const [loadingAction, setLoadingAction] = useState(false);
@@ -64,24 +63,6 @@ export default function ScalingPage() {
         <div>
           <h1>AWS Cloud Auto-Scaling Engine</h1>
           <p>Real-world EC2 capacity control, AWS SDK scaling execution, and policy decision logs.</p>
-        </div>
-        <div className="actions">
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setEngineActive(!engineActive)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              background: engineActive ? "rgba(34, 197, 94, 0.12)" : "rgba(239, 68, 68, 0.12)",
-              color: engineActive ? "#4ade80" : "#f87171",
-              border: `1px solid ${engineActive ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-            }}
-          >
-            {engineActive ? <Play size={16} /> : <Pause size={16} />}
-            {engineActive ? "Engine Active" : "Engine Paused"}
-          </button>
         </div>
       </header>
 
