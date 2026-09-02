@@ -130,7 +130,7 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
   const [activeAction, setActiveAction] = useState<ActionKind | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [openNotifications, setOpenNotifications] = useState(false);
-  const { alerts, addPolicy, addProvider, addUser } = useData();
+  const { alerts, addPolicy, addProvider, addUser, resources, scalingEvents, costRecords, auditLogs } = useData();
 
   const [notifications, setNotifications] = useState<Notification[]>(
     alerts.map((alert) => ({
@@ -150,20 +150,61 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
     }, 3200);
   }
 
+  function triggerCsvDownload(filename: string, csvContent: string) {
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   function completeAction(e: React.FormEvent<HTMLFormElement>, kind: ActionKind) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
+    if (kind === "export-report") {
+      const header = "Category,ID,Name_or_Type,Metric_or_Provider,Status_or_Severity,Timestamp\n";
+      const resRows = resources.map((r) => `Resource,${r.id},"${r.name}",${r.cloudProvider},${r.status},${r.lastSyncAt}`).join("\n");
+      const scaleRows = scalingEvents.map((s) => `ScalingEvent,${s.id},"${s.type}",${s.cloudProvider},${s.status},${s.timestamp}`).join("\n");
+      const alertRows = alerts.map((a) => `Alert,${a.id},"${a.title}",${a.resourceId},${a.severity},${a.createdAt}`).join("\n");
+      const fullCsv = `${header}${resRows}\n${scaleRows}\n${alertRows}`;
+      triggerCsvDownload(`asrms_aws_operations_report_${new Date().toISOString().slice(0, 10)}.csv`, fullCsv);
+      toast("Operations Report CSV downloaded successfully!");
+      setActiveAction(null);
+      return;
+    }
+
+    if (kind === "export-cost") {
+      const header = "Month,AWS_USD,Compute_USD,Storage_USD,Network_USD\n";
+      const rows = costRecords.map((c) => `${c.month},${c.aws},${c.compute},${c.storage || 0},${c.network || 0}`).join("\n");
+      triggerCsvDownload(`asrms_aws_cost_report_${new Date().toISOString().slice(0, 10)}.csv`, `${header}${rows}`);
+      toast("AWS Cost Report CSV downloaded successfully!");
+      setActiveAction(null);
+      return;
+    }
+
+    if (kind === "export-audit") {
+      const header = "Log_ID,Timestamp,User_Email,Action,Resource,Status,IP_Address\n";
+      const rows = auditLogs.map((a) => `${a.id},${a.timestamp},${a.userEmail},"${a.action}",${a.resource},${a.status},${a.ipAddress}`).join("\n");
+      triggerCsvDownload(`asrms_audit_compliance_log_${new Date().toISOString().slice(0, 10)}.csv`, `${header}${rows}`);
+      toast("Audit & Compliance CSV downloaded successfully!");
+      setActiveAction(null);
+      return;
+    }
+
     if (kind === "create-policy") {
       addPolicy({
         id: `pol-${Date.now()}`,
-        name: formData.get("name") as string,
-        metric: formData.get("metric") as string,
-        cloudProvider: formData.get("provider") as string,
-        thresholdUp: Number(formData.get("up")),
-        thresholdDown: Number(formData.get("down")),
-        priority: Number(formData.get("priority")),
-        cooldownPeriod: Number(formData.get("cooldown")),
+        name: (formData.get("name") as string) || "AWS Dynamic Scale Policy",
+        metric: (formData.get("metric") as string) || "cpu",
+        cloudProvider: "aws",
+        thresholdUp: Number(formData.get("up")) || 70,
+        thresholdDown: Number(formData.get("down")) || 30,
+        priority: Number(formData.get("priority")) || 8,
+        cooldownPeriod: Number(formData.get("cooldown")) || 180,
         status: "active",
         version: 1,
         updatedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
@@ -171,11 +212,11 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
     } else if (kind === "add-provider") {
       addProvider({
         id: `prov-${Date.now()}`,
-        provider: formData.get("providerType") as any,
-        displayName: formData.get("displayName") as string,
-        region: formData.get("region") as string,
+        provider: "aws",
+        displayName: (formData.get("displayName") as string) || "Amazon Web Services (AWS)",
+        region: (formData.get("region") as string) || "us-east-1",
         status: "online",
-        apiLatency: Math.floor(Math.random() * 100) + 20,
+        apiLatency: 24,
         enabled: true,
         lastChecked: "Just now",
       });

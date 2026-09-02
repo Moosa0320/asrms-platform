@@ -73,6 +73,10 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     console.error('[AWS Scaling Action] Error:', err);
-    return NextResponse.json({ error: err.message || 'AWS Action Failed' }, { status: 500 });
+    let errMsg = err.message || 'AWS Action Failed';
+    if (err.name === 'UnauthorizedOperation' || errMsg.includes('is not authorized')) {
+      errMsg = `AWS IAM Permission Required: Your AWS IAM user 'asrms' needs 'AmazonEC2FullAccess' (or ec2:StartInstances/StopInstances/RebootInstances permissions) attached in the AWS IAM Console to execute live EC2 power commands.`;
+    }
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 }
