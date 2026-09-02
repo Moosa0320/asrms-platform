@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { uid: string } }
+  { params }: { params: Promise<{ uid: string }> }
 ) {
   try {
-    const { uid } = params;
+    const { uid } = await params;
     const body = await request.json().catch(() => ({}));
     const requestingUid: string | undefined = body.requestingUid;
 
