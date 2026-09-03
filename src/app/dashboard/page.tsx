@@ -75,10 +75,22 @@ const POWER_CMDS = [
     cmd: 'aws ec2 describe-instances --instance-ids i-02720bd65ad532385 --region us-east-1 --query "Reservations[*].Instances[*].State.Name" --output text',
   },
   {
+    id: "install-aws-cli",
+    label: "Install AWS CLI on Ubuntu EC2",
+    description: "Run this once inside the SSH terminal if you want to use the aws command.",
+    cmd: "sudo apt update && sudo apt install -y awscli",
+  },
+  {
     id: "shutdown-ssh",
-    label: "Shutdown from Inside SSH Session",
-    description: "Linux system command to shut down the VM directly from the terminal.",
-    cmd: "sudo shutdown -h now",
+    label: "Shutdown from Inside SSH Session (No AWS CLI Needed)",
+    description: "Standard Linux command to power off the VM immediately from within SSH.",
+    cmd: "sudo poweroff",
+  },
+  {
+    id: "reboot-ssh",
+    label: "Reboot from Inside SSH Session (No AWS CLI Needed)",
+    description: "Standard Linux command to reboot the VM directly from within SSH.",
+    cmd: "sudo reboot",
   },
 ];
 

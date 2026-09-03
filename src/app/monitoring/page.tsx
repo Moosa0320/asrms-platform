@@ -94,10 +94,22 @@ export default function MonitoringPage() {
       description: "Queries current status (running, stopped, pending) of the instance.",
     },
     {
+      id: "install-aws-cli",
+      title: "Install AWS CLI on Ubuntu EC2",
+      command: "sudo apt update && sudo apt install -y awscli",
+      description: "Run this once inside the SSH terminal if you want to use the aws command.",
+    },
+    {
       id: "shutdown-ssh",
-      title: "Shutdown from Inside SSH Session",
-      command: "sudo shutdown -h now",
-      description: "Linux system command to shut down the VM directly from the terminal.",
+      title: "Shutdown from Inside SSH Session (No AWS CLI Needed)",
+      command: "sudo poweroff",
+      description: "Standard Linux command to power off the VM immediately from within SSH.",
+    },
+    {
+      id: "reboot-ssh",
+      title: "Reboot from Inside SSH Session (No AWS CLI Needed)",
+      command: "sudo reboot",
+      description: "Standard Linux command to reboot the VM directly from within SSH.",
     },
   ];
 
