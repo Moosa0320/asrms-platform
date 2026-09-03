@@ -145,9 +145,9 @@ export default function ScalingPage() {
                 <label className="field span-2">
                   Scaling Command Action
                   <select value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)}>
-                    <option value="start">▶ Start EC2 Instance (Scale Up / Boot)</option>
-                    <option value="stop">⏹ Stop EC2 Instance (Scale Down / Power Off)</option>
-                    <option value="reboot">🔄 Reboot EC2 Instance (Restart Service)</option>
+                    <option value="start">Start EC2 Instance (Scale Up / Boot)</option>
+                    <option value="stop">Stop EC2 Instance (Scale Down / Power Off)</option>
+                    <option value="reboot">Reboot EC2 Instance (Restart Service)</option>
                   </select>
                 </label>
 

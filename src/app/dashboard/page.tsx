@@ -19,78 +19,78 @@ const STRESS_CMDS = [
   {
     id: "cpu-60s",
     label: "CPU Load (All Cores, 60 Seconds)",
-    description: "Spawns parallel yes processes across all CPU cores and auto-terminates after 60s.",
-    cmd: "for i in $(seq 1 $(nproc)); do yes > /dev/null & done; sleep 60; killall yes",
+    description: "Runs parallel workload across all CPU cores and auto-terminates after 60s.",
+    cmd: "for i in $(seq 1 $(nproc)); do yes > /dev/null & done; sleep 60; pkill -9 yes 2>/dev/null || killall yes 2>/dev/null",
   },
   {
     id: "cpu-mem-python",
     label: "CPU + Memory Stress (Python3, 60 Seconds)",
-    description: "Allocates 300MB RAM and runs continuous floating-point iterations for 60s.",
-    cmd: `python3 -c "import time; data = bytearray(300 * 1024 * 1024); t = time.time() + 60; [i*i for i in range(100000000) if time.time() < t]"`,
+    description: "Allocates memory and runs floating-point iterations for 60s.",
+    cmd: `python3 -c "import time; t=time.time()+60; [i*i for i in range(100000000) if time.time()<t]"`,
   },
   {
     id: "stress-pkg",
     label: "Linux Stress Utility (60 Seconds)",
-    description: "Installs and executes stress tool for 2 CPU workers and 256MB memory.",
-    cmd: "sudo apt update && sudo apt install -y stress 2>/dev/null || sudo yum install -y stress 2>/dev/null; stress --cpu 2 --vm 1 --vm-bytes 256M --timeout 60s",
+    description: "Installs stress tool and applies CPU and memory load for 60s.",
+    cmd: "sudo apt update && sudo apt install -y stress && stress --cpu 2 --vm 1 --vm-bytes 256M --timeout 60s",
   },
   {
     id: "bg-loop",
     label: "Background Infinite CPU Loop",
-    description: "Runs infinite while loop in background. Stop with: pkill -f 'while true'",
+    description: "Runs infinite while loop in background. Stop with: pkill -9 -f 'while true'",
     cmd: "while true; do :; done &",
   },
   {
     id: "stop-all",
     label: "Terminate All Active Stress Processes",
-    description: "Immediately kills all background yes, python, while loops, and stress processes.",
-    cmd: "killall yes 2>/dev/null; pkill -f 'while true' 2>/dev/null; pkill -f python3 2>/dev/null; killall stress 2>/dev/null",
+    description: "Immediately kills all background yes, python, while loops, and stress utility processes.",
+    cmd: "pkill -9 yes 2>/dev/null; pkill -9 -f 'while true' 2>/dev/null; pkill -9 python3 2>/dev/null; pkill -9 stress 2>/dev/null; killall yes 2>/dev/null",
   },
 ];
 
 // ─── Manual Instance Start/Stop Commands ─────────────────────────────────────
 const POWER_CMDS = [
   {
-    id: "start-aws-cli",
-    label: "Start EC2 Instance (AWS CLI)",
-    description: "Powers on the stopped EC2 instance via AWS CLI.",
-    cmd: "aws ec2 start-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
-  },
-  {
-    id: "stop-aws-cli",
-    label: "Stop EC2 Instance (AWS CLI)",
-    description: "Gracefully powers off the EC2 instance via AWS CLI.",
-    cmd: "aws ec2 stop-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
-  },
-  {
-    id: "reboot-aws-cli",
-    label: "Reboot EC2 Instance (AWS CLI)",
-    description: "Performs a clean reboot of the EC2 instance via AWS CLI.",
-    cmd: "aws ec2 reboot-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
-  },
-  {
-    id: "status-aws-cli",
-    label: "Check Instance State (AWS CLI)",
-    description: "Queries current status (running, stopped, pending) of the instance.",
-    cmd: 'aws ec2 describe-instances --instance-ids i-02720bd65ad532385 --region us-east-1 --query "Reservations[*].Instances[*].State.Name" --output text',
-  },
-  {
-    id: "install-aws-cli",
-    label: "Install AWS CLI on Ubuntu EC2",
-    description: "Run this once inside the SSH terminal if you want to use the aws command.",
-    cmd: "sudo apt update && sudo apt install -y awscli",
-  },
-  {
     id: "shutdown-ssh",
-    label: "Shutdown from Inside SSH Session (No AWS CLI Needed)",
-    description: "Standard Linux command to power off the VM immediately from within SSH.",
+    label: "Stop EC2 Instance (Inside SSH - No AWS CLI Needed)",
+    description: "Standard Linux command to power off the VM immediately from inside SSH. AWS detects it as stopped.",
     cmd: "sudo poweroff",
   },
   {
     id: "reboot-ssh",
-    label: "Reboot from Inside SSH Session (No AWS CLI Needed)",
-    description: "Standard Linux command to reboot the VM directly from within SSH.",
+    label: "Reboot EC2 Instance (Inside SSH - No AWS CLI Needed)",
+    description: "Standard Linux command to reboot the VM directly from inside your SSH session.",
     cmd: "sudo reboot",
+  },
+  {
+    id: "install-aws-cli",
+    label: "Install AWS CLI on Ubuntu EC2 (Optional)",
+    description: "Run this inside SSH if you want to use the aws command line tool inside the server.",
+    cmd: "sudo apt update && sudo apt install -y awscli && aws configure",
+  },
+  {
+    id: "stop-aws-cli",
+    label: "Stop EC2 Instance (From Local PC via AWS CLI)",
+    description: "Run on your computer with AWS CLI configured to power off the instance remotely.",
+    cmd: "aws ec2 stop-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+  },
+  {
+    id: "start-aws-cli",
+    label: "Start EC2 Instance (From Local PC via AWS CLI)",
+    description: "Run on your computer with AWS CLI configured to power on the stopped EC2 instance.",
+    cmd: "aws ec2 start-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+  },
+  {
+    id: "reboot-aws-cli",
+    label: "Reboot EC2 Instance (From Local PC via AWS CLI)",
+    description: "Run on your computer with AWS CLI configured to cleanly reboot the instance.",
+    cmd: "aws ec2 reboot-instances --instance-ids i-02720bd65ad532385 --region us-east-1",
+  },
+  {
+    id: "status-aws-cli",
+    label: "Check State (From Local PC via AWS CLI)",
+    description: "Queries current status (running, stopped, pending) of the instance.",
+    cmd: 'aws ec2 describe-instances --instance-ids i-02720bd65ad532385 --region us-east-1 --query "Reservations[*].Instances[*].State.Name" --output text',
   },
 ];
 
