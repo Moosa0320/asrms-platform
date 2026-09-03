@@ -30,8 +30,8 @@ export default function LoginPage() {
           <Logo />
           <h1>ASRMS Cloud Resource Control</h1>
           <p>
-            Enterprise auto-scaling, monitoring, policy governance, and audit readiness across
-            AWS, Azure, and GCP.
+            Enterprise auto-scaling, monitoring, policy governance, and audit readiness for
+            Amazon Web Services (AWS) cloud infrastructure.
           </p>
         </div>
         <form className="login-form" onSubmit={submit}>

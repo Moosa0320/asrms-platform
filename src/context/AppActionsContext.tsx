@@ -161,7 +161,9 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
     document.body.removeChild(link);
   }
 
-  function completeAction(e: React.FormEvent<HTMLFormElement>, kind: ActionKind) {
+  const [submitting, setSubmitting] = useState(false);
+
+  async function completeAction(e: React.FormEvent<HTMLFormElement>, kind: ActionKind) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
@@ -221,15 +223,25 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
         lastChecked: "Just now",
       });
     } else if (kind === "create-user") {
-      addUser({
-        uid: `u-${Date.now()}`,
-        displayName: formData.get("displayName") as string,
-        email: formData.get("email") as string,
-        password: formData.get("password") as string,
-        role: formData.get("role") as any,
-        status: "active",
-        lastLogin: "Never",
-      });
+      setSubmitting(true);
+      try {
+        await addUser({
+          uid: `u-${Date.now()}`,
+          displayName: (formData.get("displayName") as string)?.trim() || "New User",
+          email: (formData.get("email") as string)?.trim().toLowerCase(),
+          password: formData.get("password") as string,
+          role: formData.get("role") as any,
+          status: "active",
+          lastLogin: "Never",
+        });
+        toast("User account created in database successfully!");
+        setActiveAction(null);
+      } catch (err: any) {
+        toast(err.message || "Failed to create user in database.", "warning");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
     }
 
     toast(`${actionMeta[kind].title} completed successfully.`);
@@ -279,9 +291,9 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
               <div className="form-grid">
                 {modalAction === "create-policy" && (
                   <>
-                    <label className="field span-2">Name<input name="name" required defaultValue="New Policy" /></label>
+                    <label className="field span-2">Name<input name="name" required defaultValue="New AWS Policy" /></label>
                     <label className="field">Metric<select name="metric"><option>cpu</option><option>memory</option><option>latency</option></select></label>
-                    <label className="field">Provider<select name="provider"><option>aws</option><option>azure</option><option>gcp</option><option>all</option></select></label>
+                    <label className="field">Provider<select name="provider" disabled><option value="aws">Amazon Web Services (AWS)</option></select></label>
                     <label className="field">Scale up at<input name="up" type="number" required defaultValue="80" /></label>
                     <label className="field">Scale down at<input name="down" type="number" required defaultValue="40" /></label>
                     <label className="field">Priority<input name="priority" type="number" required defaultValue="5" /></label>
@@ -290,8 +302,8 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
                 )}
                 {modalAction === "add-provider" && (
                   <>
-                    <label className="field span-2">Display Name<input name="displayName" required defaultValue="Production AWS" /></label>
-                    <label className="field">Provider Type<select name="providerType"><option value="aws">AWS</option><option value="azure">Azure</option><option value="gcp">GCP</option></select></label>
+                    <label className="field span-2">Display Name<input name="displayName" required defaultValue="Amazon Web Services (AWS)" /></label>
+                    <label className="field">Provider Type<select name="providerType" disabled><option value="aws">Amazon Web Services (AWS)</option></select></label>
                     <label className="field">Region<input name="region" required defaultValue="us-east-1" /></label>
                   </>
                 )}
@@ -299,7 +311,7 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
                   <>
                     <label className="field span-2">Display Name<input name="displayName" required defaultValue="New User" /></label>
                     <label className="field">Email<input name="email" type="email" required defaultValue="user@asrms.io" /></label>
-                    <label className="field">Password<input name="password" type="password" required defaultValue="temp123" /></label>
+                    <label className="field">Password (min 6 chars)<input name="password" type="password" required minLength={6} defaultValue="temp123" /></label>
                     <label className="field">Role<select name="role"><option value="admin">Admin</option><option value="operator">Operator</option><option value="viewer">Viewer</option><option value="developer">Developer</option></select></label>
                   </>
                 )}
@@ -310,8 +322,10 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
                 )}
               </div>
               <footer className="modal-actions">
-                <button className="ghost-button" type="button" onClick={() => setActiveAction(null)}>Cancel</button>
-                <button className="button" type="submit">{meta.button}</button>
+                <button className="ghost-button" type="button" disabled={submitting} onClick={() => setActiveAction(null)}>Cancel</button>
+                <button className="button" type="submit" disabled={submitting}>
+                  {submitting ? "Processing..." : meta.button}
+                </button>
               </footer>
             </form>
           </section>

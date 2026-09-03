@@ -234,10 +234,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addPolicy = (policy: PolicyType) => setPolicies((prev) => [...prev, policy]);
   const addProvider = (provider: ProviderType) => setCloudProviders((prev) => [...prev, provider]);
   const addUser = async (user: UserType) => {
-    if (isFirebaseConfigured && db) {
-      const { adminCreateUser } = await import("@/lib/auth");
-      await adminCreateUser(user.displayName, user.email, user.password || "temp123", user.role);
-    } else {
+    let created = false;
+    let apiError: string | null = null;
+
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: user.displayName,
+          email: user.email,
+          password: user.password || "temp123",
+          role: user.role,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        created = true;
+        return data.user;
+      }
+      if (data.error && !data.useClientFallback) {
+        throw new Error(data.error);
+      }
+      apiError = data.error;
+    } catch (e: any) {
+      if (e.message && !e.message.includes("useClientFallback") && !e.message.includes("Failed to fetch")) {
+        throw e;
+      }
+      apiError = e.message;
+    }
+
+    // Fallback: client-side Firebase Auth + Firestore
+    if (!created && isFirebaseConfigured && db) {
+      try {
+        const { adminCreateUser } = await import("@/lib/auth");
+        return await adminCreateUser(user.displayName, user.email, user.password || "temp123", user.role);
+      } catch (clientErr: any) {
+        console.error("Client fallback user creation failed:", clientErr);
+        throw new Error(clientErr.message || apiError || "Failed to create user account in database.");
+      }
+    } else if (!created) {
       setUsers((prev) => [...prev, user]);
     }
   };

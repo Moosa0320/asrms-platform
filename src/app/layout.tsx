@@ -18,7 +18,12 @@ export const metadata: Metadata = {
   title: "ASRMS Platform",
   description: "Auto-Scaling Resource Management System",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/asrms-shield-icon.png", sizes: "256x256", type: "image/png" },
+      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+    ],
+    shortcut: "/asrms-shield-icon.png",
+    apple: "/apple-icon.png",
   },
 };
 
