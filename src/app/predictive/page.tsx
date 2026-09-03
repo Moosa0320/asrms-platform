@@ -5,8 +5,12 @@ import { BrainCircuit, ToggleRight, Server, Zap, CheckCircle } from "lucide-reac
 import { LiveChart } from "@/components/LiveChart";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useAuth } from "@/context/AuthContext";
 
 export default function PredictivePage() {
+  const { user } = useAuth();
+  const role = user?.role || "viewer";
+  const canToggle = role === "admin" || role === "super_admin" || role === "operator";
   const [liveCpu, setLiveCpu] = useState(12);
   const [predictiveEnabled, setPredictiveEnabled] = useState(true);
 
@@ -36,15 +40,17 @@ export default function PredictivePage() {
           <h1>AWS Predictive Scaling AI</h1>
           <p>Machine learning workload forecast, peak prediction, and proactive capacity recommendations for AWS EC2.</p>
         </div>
-        <button
-          type="button"
-          className="ghost-button"
-          onClick={() => setPredictiveEnabled(!predictiveEnabled)}
-          style={{ display: "flex", alignItems: "center", gap: "6px" }}
-        >
-          <ToggleRight size={16} style={{ color: predictiveEnabled ? "#4ade80" : "var(--faint)" }} />
-          {predictiveEnabled ? "Predictive Scaling Active" : "Predictive Standby"}
-        </button>
+        {canToggle && (
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setPredictiveEnabled(!predictiveEnabled)}
+            style={{ display: "flex", alignItems: "center", gap: "6px" }}
+          >
+            <ToggleRight size={16} style={{ color: predictiveEnabled ? "#4ade80" : "var(--faint)" }} />
+            {predictiveEnabled ? "Predictive Scaling Active" : "Predictive Standby"}
+          </button>
+        )}
       </header>
 
       {/* KPI Cards */}

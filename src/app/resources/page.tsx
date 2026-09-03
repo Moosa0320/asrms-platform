@@ -6,9 +6,13 @@ import { DataTable } from "@/components/DataTable";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ResourcesPage() {
   const { resources } = useData();
+  const { user } = useAuth();
+  const role = user?.role || "viewer";
+  const canRefresh = role === "admin" || role === "super_admin" || role === "operator";
 
   // AWS-Only Resources
   const awsResources = resources.filter((r) => r.cloudProvider === "aws");
@@ -20,11 +24,13 @@ export default function ResourcesPage() {
           <h1>AWS Resource Inventory</h1>
           <p>Live inventory of your connected Amazon Web Services EC2 instances, EBS volumes, and Auto-Scaling Groups.</p>
         </div>
-        <div className="actions">
-          <ActionButton action="refresh-discovery">
-            <RefreshCw size={16} /> Refresh AWS Discovery
-          </ActionButton>
-        </div>
+        {canRefresh && (
+          <div className="actions">
+            <ActionButton action="refresh-discovery">
+              <RefreshCw size={16} /> Refresh AWS Discovery
+            </ActionButton>
+          </div>
+        )}
       </header>
 
       {/* KPI Cards */}

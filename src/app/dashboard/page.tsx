@@ -12,6 +12,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
 import { useAppActions } from "@/context/AppActionsContext";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Verified Linux / Bash Stress Commands (No Emojis) ───────────────────────
 const STRESS_CMDS = [
@@ -113,6 +114,9 @@ function CopyButton({ text }: { text: string }) {
 export default function DashboardPage() {
   const { resources, scalingEvents } = useData();
   const { notifications } = useAppActions();
+  const { user } = useAuth();
+  const role = user?.role || "viewer";
+  const canOperate = role === "admin" || role === "super_admin" || role === "operator";
 
   const [liveTelemetry, setLiveTelemetry] = useState<{
     cpu: number; memory: number; network: number; latency: number; source?: string; instanceId?: string; state?: string;
@@ -156,12 +160,16 @@ export default function DashboardPage() {
         </div>
         <div className="actions">
           <span className="live-dot">AWS connected</span>
-          <ActionButton action="manual-scale" className="ghost-button">
-            <Gauge size={14} /> Manual Scale
-          </ActionButton>
-          <ActionButton action="create-policy" className="ghost-button">
-            <Plus size={14} /> Policy
-          </ActionButton>
+          {canOperate && (
+            <>
+              <ActionButton action="manual-scale" className="ghost-button">
+                <Gauge size={14} /> Manual Scale
+              </ActionButton>
+              <ActionButton action="create-policy" className="ghost-button">
+                <Plus size={14} /> Policy
+              </ActionButton>
+            </>
+          )}
           <ActionButton action="export-report">
             <Download size={14} /> Export
           </ActionButton>

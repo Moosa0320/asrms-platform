@@ -6,6 +6,7 @@ import { DataTable } from "@/components/DataTable";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface DynamicAlert extends Record<string, unknown> {
   id: string;
@@ -21,6 +22,9 @@ interface DynamicAlert extends Record<string, unknown> {
 
 export default function AlertsPage() {
   const { alerts, setAlerts } = useData();
+  const { user } = useAuth();
+  const role = user?.role || "viewer";
+  const canSendAlert = role === "admin" || role === "super_admin" || role === "operator";
   const [liveAlerts, setLiveAlerts] = useState<DynamicAlert[]>([]);
   const [liveTelemetry, setLiveTelemetry] = useState<{ cpu: number; memory: number; latency: number; source: string } | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -140,17 +144,19 @@ export default function AlertsPage() {
           <h1>AWS Realtime Alerts &amp; Incidents</h1>
           <p>Real-world threshold monitoring powered by live AWS CloudWatch metrics and automated notification pipelines.</p>
         </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <button
-            className="button"
-            type="button"
-            onClick={handleTestEmail}
-            disabled={sendingEmail}
-            style={{ display: "flex", alignItems: "center", gap: "6px" }}
-          >
-            <Send size={15} /> {sendingEmail ? "Dispatching..." : "Send Live Alert Email"}
-          </button>
-        </div>
+        {canSendAlert && (
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              className="button"
+              type="button"
+              onClick={handleTestEmail}
+              disabled={sendingEmail}
+              style={{ display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              <Send size={15} /> {sendingEmail ? "Dispatching..." : "Send Live Alert Email"}
+            </button>
+          </div>
+        )}
       </header>
 
       {emailStatus && (
