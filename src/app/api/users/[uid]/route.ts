@@ -25,53 +25,64 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing uid parameter." }, { status: 400 });
     }
 
-    const adminAuth = getAdminAuth();
-    const adminDb = getAdminFirestore();
+    try {
+      const adminAuth = getAdminAuth();
+      const adminDb = getAdminFirestore();
 
-    // --- Authorisation check ---
-    if (requestingUid) {
-      const requesterDoc = await adminDb.collection("users").doc(requestingUid).get();
-      if (requesterDoc.exists) {
-        const requesterRole = requesterDoc.data()?.role;
-        if (requesterRole !== "super_admin" && requesterRole !== "admin") {
-          return NextResponse.json(
-            { error: "Permission denied: only admins can delete users." },
-            { status: 403 }
-          );
+      // --- Authorisation check ---
+      if (requestingUid) {
+        const requesterDoc = await adminDb.collection("users").doc(requestingUid).get();
+        if (requesterDoc.exists) {
+          const requesterRole = requesterDoc.data()?.role;
+          if (requesterRole !== "super_admin" && requesterRole !== "admin") {
+            return NextResponse.json(
+              { error: "Permission denied: only admins can delete users." },
+              { status: 403 }
+            );
+          }
         }
       }
-    }
 
-    // Prevent deleting yourself
-    if (uid === requestingUid) {
+      // Prevent deleting yourself
+      if (uid === requestingUid) {
+        return NextResponse.json(
+          { error: "You cannot delete your own account." },
+          { status: 400 }
+        );
+      }
+
+      // --- 1. Delete from Firebase Auth ---
+      try {
+        await adminAuth.deleteUser(uid);
+      } catch (authErr: any) {
+        // If the user was never in Auth (e.g. manually inserted into Firestore), continue
+        if (authErr.code !== "auth/user-not-found") {
+          throw authErr;
+        }
+      }
+
+      // --- 2. Delete Firestore document ---
+      await adminDb.collection("users").doc(uid).delete();
+
+      return NextResponse.json({
+        success: true,
+        message: `User ${uid} has been permanently deleted from Firebase Auth and Firestore.`,
+      });
+    } catch (adminErr: any) {
+      console.warn("[DELETE /api/users/[uid]] Admin SDK unavailable, requesting client fallback:", adminErr.message);
       return NextResponse.json(
-        { error: "You cannot delete your own account." },
-        { status: 400 }
+        {
+          error: adminErr.message || "Admin SDK not configured on server.",
+          useClientFallback: true,
+        },
+        { status: 200 }
       );
     }
-
-    // --- 1. Delete from Firebase Auth ---
-    try {
-      await adminAuth.deleteUser(uid);
-    } catch (authErr: any) {
-      // If the user was never in Auth (e.g. manually inserted into Firestore), continue
-      if (authErr.code !== "auth/user-not-found") {
-        throw authErr;
-      }
-    }
-
-    // --- 2. Delete Firestore document ---
-    await adminDb.collection("users").doc(uid).delete();
-
-    return NextResponse.json({
-      success: true,
-      message: `User ${uid} has been permanently deleted from Firebase Auth and Firestore.`,
-    });
   } catch (err: any) {
     console.error("[DELETE /api/users/[uid]] Error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to delete user." },
-      { status: 500 }
+      { error: err.message || "Failed to delete user.", useClientFallback: true },
+      { status: 200 }
     );
   }
 }

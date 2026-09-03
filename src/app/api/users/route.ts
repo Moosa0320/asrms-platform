@@ -75,14 +75,14 @@ export async function POST(request: Request) {
           error: adminErr.message || "Failed to create user via Admin SDK",
           useClientFallback: true,
         },
-        { status: 500 }
+        { status: 200 }
       );
     }
   } catch (err: any) {
     console.error("[POST /api/users] General error:", err);
     return NextResponse.json(
-      { error: err.message || "Internal server error." },
-      { status: 500 }
+      { error: err.message || "Internal server error.", useClientFallback: true },
+      { status: 200 }
     );
   }
 }

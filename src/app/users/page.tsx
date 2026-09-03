@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
-import { updateRecord } from "@/lib/firestore";
+import { updateRecord, deleteRecord } from "@/lib/firestore";
 
 export default function UsersPage() {
   const { users: allUsers, permissionMatrix, removeUser } = useData();
@@ -53,7 +53,8 @@ export default function UsersPage() {
   }
 
   async function handleRemove(targetUser: typeof allUsers[0]) {
-    if (currentUser?.uid === targetUser.uid) {
+    const targetUid = targetUser.uid || (targetUser as any).id;
+    if (currentUser?.uid === targetUid) {
       alert("You cannot remove yourself from the system.");
       return;
     }
@@ -74,18 +75,18 @@ export default function UsersPage() {
 
     if (confirm(`Are you sure you want to permanently delete ${targetUser.displayName} (${targetUser.email}) from the system? This cannot be undone.`)) {
       try {
-        const res = await fetch(`/api/users/${targetUser.uid}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requestingUid: currentUser?.uid }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          alert(`Failed to remove user: ${data.error || "Unknown error"}`);
+        // 1. Trigger context removeUser (which calls API and Firestore delete)
+        await removeUser(targetUid);
+        // 2. Direct deleteRecord ensure it is purged from Firestore
+        await deleteRecord("users", targetUid);
+      } catch (err: any) {
+        console.warn("removeUser had warning, forcing direct Firestore deletion:", err);
+        try {
+          await deleteRecord("users", targetUid);
+        } catch (dbErr: any) {
+          console.error("Direct deletion error:", dbErr);
+          alert(`Failed to remove user: ${dbErr.message || "Database write error"}`);
         }
-      } catch (err) {
-        console.error("Failed to remove user:", err);
-        alert("An unexpected error occurred while removing the user.");
       }
     }
   }

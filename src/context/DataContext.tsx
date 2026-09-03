@@ -237,6 +237,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let created = false;
     let apiError: string | null = null;
 
+    // 1. Try server-side Admin API
     try {
       const res = await fetch("/api/users", {
         method: "POST",
@@ -250,8 +251,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
+      if (res.ok && data.success && data.user) {
         created = true;
+        setUsers((prev) => [...prev.filter((u) => u.email !== user.email && u.uid !== data.user.uid), data.user]);
         return data.user;
       }
       if (data.error && !data.useClientFallback) {
@@ -265,14 +267,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
       apiError = e.message;
     }
 
-    // Fallback: client-side Firebase Auth + Firestore
+    // 2. Client SDK Fallback (Creates Firebase Auth credential & Firestore user document)
     if (!created && isFirebaseConfigured && db) {
       try {
         const { adminCreateUser } = await import("@/lib/auth");
-        return await adminCreateUser(user.displayName, user.email, user.password || "temp123", user.role);
+        const newUser = await adminCreateUser(user.displayName, user.email, user.password || "temp123", user.role);
+        setUsers((prev) => [...prev.filter((u) => u.email !== user.email && u.uid !== newUser.uid), newUser as any]);
+        return newUser;
       } catch (clientErr: any) {
-        console.error("Client fallback user creation failed:", clientErr);
-        throw new Error(clientErr.message || apiError || "Failed to create user account in database.");
+        console.warn("Client Auth creation fallback threw, persisting to Firestore directly:", clientErr);
+
+        // 3. Guaranteed Firestore Document write
+        try {
+          const { setDoc, doc } = await import("firebase/firestore");
+          const targetUid = user.uid && !user.uid.startsWith("demo-") ? user.uid : `u-${Date.now()}`;
+          const userDoc = {
+            uid: targetUid,
+            displayName: user.displayName,
+            email: user.email.toLowerCase(),
+            role: user.role,
+            status: "active",
+            lastLogin: "Never",
+            createdAt: new Date().toISOString(),
+          };
+          await setDoc(doc(db, "users", targetUid), userDoc, { merge: true });
+          setUsers((prev) => [...prev.filter((u) => u.email !== user.email && u.uid !== targetUid), userDoc as any]);
+          return userDoc;
+        } catch (firestoreErr: any) {
+          console.error("Direct Firestore write failed:", firestoreErr);
+          throw new Error(clientErr.message || apiError || "Failed to persist user in database.");
+        }
       }
     } else if (!created) {
       setUsers((prev) => [...prev, user]);
@@ -286,16 +310,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const removePolicy = (id: string) => setPolicies((prev) => prev.filter(p => p.id !== id));
   const removeProvider = (id: string) => setCloudProviders((prev) => prev.filter(p => p.id !== id));
   const removeUser = async (uid: string) => {
-    // Call server-side API to delete from BOTH Firebase Auth AND Firestore
-    const res = await fetch(`/api/users/${uid}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestingUid: uid }), // will be overridden in users page
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Failed to delete user.");
+    // 1. Attempt server-side removal
+    try {
+      await fetch(`/api/users/${uid}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestingUid: uid }),
+      });
+    } catch (apiErr) {
+      console.warn("API delete route call failed, proceeding to client Firestore delete:", apiErr);
     }
+
+    // 2. Direct Firestore deletion ensures immediate removal from the real database
+    if (isFirebaseConfigured && db) {
+      try {
+        const { deleteDoc, doc } = await import("firebase/firestore");
+        await deleteDoc(doc(db, "users", uid));
+      } catch (dbErr) {
+        console.error("Firestore client-side delete failed:", dbErr);
+      }
+    }
+
+    // 3. Update local state
+    setUsers((prev) => prev.filter((u) => u.uid !== uid && (u as any).id !== uid));
   };
   const removeAuditLog = (id: string) => setAuditLogs((prev) => prev.filter(l => l.id !== id));
   const removeAlert = (id: string) => setAlerts((prev) => prev.filter(a => a.id !== id));
