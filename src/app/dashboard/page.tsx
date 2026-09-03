@@ -51,6 +51,18 @@ const STRESS_CMDS = [
 // ─── Manual Instance Start/Stop Commands ─────────────────────────────────────
 const POWER_CMDS = [
   {
+    id: "top-inspect",
+    label: "Inspect Live CPU & Processes (Inside SSH - Batch Mode)",
+    description: "Outputs an instant batch snapshot of live CPU utilization and top tasks in terminal.",
+    cmd: "top -b -n 1 | head -n 15",
+  },
+  {
+    id: "force-kill-all",
+    label: "Force Terminate All Stress Processes (Emergency Stop)",
+    description: "Immediately force-kills (-9) all background yes, while loops, python, and stress processes.",
+    cmd: 'sudo pkill -9 yes; sudo pkill -9 -f "while true"; sudo pkill -9 python3; sudo pkill -9 stress',
+  },
+  {
     id: "shutdown-ssh",
     label: "Stop EC2 Instance (Inside SSH - No AWS CLI Needed)",
     description: "Standard Linux command to power off the VM immediately from inside SSH. AWS detects it as stopped.",

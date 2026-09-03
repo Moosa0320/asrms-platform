@@ -70,6 +70,18 @@ export default function MonitoringPage() {
 
   const powerCommands = [
     {
+      id: "top-inspect",
+      title: "Inspect Live CPU & Processes (Inside SSH - Batch Mode)",
+      command: "top -b -n 1 | head -n 15",
+      description: "Outputs an instant batch snapshot of live CPU utilization and top tasks in terminal.",
+    },
+    {
+      id: "force-kill-all",
+      title: "Force Terminate All Stress Processes (Emergency Stop)",
+      command: 'sudo pkill -9 yes; sudo pkill -9 -f "while true"; sudo pkill -9 python3; sudo pkill -9 stress',
+      description: "Immediately force-kills (-9) all background yes, while loops, python, and stress processes.",
+    },
+    {
       id: "shutdown-ssh",
       title: "Stop EC2 Instance (Inside SSH - No AWS CLI Needed)",
       command: "sudo poweroff",
