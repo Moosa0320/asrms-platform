@@ -129,23 +129,57 @@ export async function createUser(
     throw new Error("Firebase is not configured. Cannot create user.");
   }
 
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
-
-  // Super admin email always gets super_admin role
   const isSuperAdmin = email.toLowerCase() === SUPER_ADMIN_EMAIL;
-  
-  // If they want anything above viewer, they go into pending state (unless they are super admin)
   const role: Role = isSuperAdmin ? "super_admin" : (requestedRole === "viewer" ? "viewer" : "pending");
 
+  let uid: string;
+
+  try {
+    // Attempt to create a brand-new Auth account
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    uid = cred.user.uid;
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === "auth/email-already-in-use") {
+      // Email already registered in Firebase Auth — sign in to retrieve UID,
+      // then upsert the Firestore profile if missing.
+      let signinCred;
+      try {
+        signinCred = await signInWithEmailAndPassword(auth, email, password);
+      } catch {
+        throw new Error(
+          "This email is already registered. Please sign in instead, or use a different email.",
+        );
+      }
+      uid = signinCred.user.uid;
+
+      // Check if a Firestore profile already exists — if so, just sign the user in
+      const existing = await getDoc(doc(db, "users", uid));
+      if (existing.exists()) {
+        const d = existing.data();
+        return {
+          uid,
+          displayName: d.displayName || email.split("@")[0],
+          email,
+          role: d.role as Role,
+          status: d.status || "active",
+        };
+      }
+      // No Firestore profile yet — fall through to create one below
+    } else {
+      throw err;
+    }
+  }
+
   const newUser = {
-    uid: cred.user.uid,
+    uid,
     displayName: email.split("@")[0],
     email,
     role,
     requestedRole: role === "pending" ? requestedRole : null,
     status: "active",
   };
-  await setDoc(doc(db, "users", cred.user.uid), newUser);
+  await setDoc(doc(db, "users", uid), newUser);
 
   // Trigger admin email notification via Resend
   try {
@@ -158,7 +192,7 @@ export async function createUser(
         message: `A new user with email ${email} has just registered with requested role: ${requestedRole.toUpperCase()} (assigned initial role: ${role.toUpperCase()}).`,
         severity: role === "pending" ? "warning" : "info",
         metadata: {
-          UID: cred.user.uid,
+          UID: uid,
           Email: email,
           "Requested Role": requestedRole,
           "Assigned Role": role,
@@ -212,10 +246,32 @@ export async function adminCreateUser(
   const tempApp = initializeApp(firebaseConfig, tempAppName);
   const tempAuth = getAuth(tempApp);
 
-  try {
-    const cred = await createUserWithEmailAndPassword(tempAuth, email, password);
-    const uid = cred.user.uid;
+  let uid: string;
 
+  try {
+    try {
+      const cred = await createUserWithEmailAndPassword(tempAuth, email, password);
+      uid = cred.user.uid;
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/email-already-in-use") {
+        // Email already in Firebase Auth — sign in to get the UID
+        try {
+          const cred = await signInWithEmailAndPassword(tempAuth, email, password);
+          uid = cred.user.uid;
+        } catch {
+          // Password wrong or unknown — still try to create the Firestore doc with a placeholder UID
+          // (admin can reset password separately in Firebase console)
+          throw new Error(
+            `User ${email} already exists in Firebase Auth. If you want to add them to ASRMS, have them sign in and approve their role, or reset their password in Firebase Console first.`,
+          );
+        }
+      } else {
+        throw err;
+      }
+    }
+
+    // Upsert the Firestore profile (merge so we don't overwrite if already exists)
     const newUser = {
       uid,
       displayName,
@@ -224,8 +280,7 @@ export async function adminCreateUser(
       status: "active",
       lastLogin: "Never",
     };
-
-    await setDoc(doc(db, "users", uid), newUser);
+    await setDoc(doc(db, "users", uid), newUser, { merge: true });
     return newUser;
   } finally {
     await deleteApp(tempApp);
