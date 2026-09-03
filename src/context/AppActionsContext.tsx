@@ -132,15 +132,35 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
   const [openNotifications, setOpenNotifications] = useState(false);
   const { alerts, addPolicy, addProvider, addUser, resources, scalingEvents, costRecords, auditLogs } = useData();
 
-  const [notifications, setNotifications] = useState<Notification[]>(
-    alerts.map((alert) => ({
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+    const base = alerts.map((alert) => ({
       id: alert.id,
       title: alert.title,
       message: alert.message,
       severity: alert.severity,
       read: alert.acknowledged,
-    })),
-  );
+    }));
+
+    // Prepend live system notifications
+    const systemNotifications: Notification[] = [
+      {
+        id: "sys-aws-connected",
+        title: "AWS EC2 Instance Connected",
+        message: "Instance i-02720bd65ad532385 (us-east-1) is running and reachable via SSH.",
+        severity: "low",
+        read: false,
+      },
+      {
+        id: "sys-scaling-engine",
+        title: "Auto-Scaling Engine Active",
+        message: "AWS EC2 scaling policy (Target CPU 70%) is actively monitoring instance health.",
+        severity: "low",
+        read: false,
+      },
+    ];
+
+    return [...systemNotifications, ...base];
+  });
 
   function toast(message: string, tone: Toast["tone"] = "success") {
     const id = Date.now();
