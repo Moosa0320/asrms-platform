@@ -55,8 +55,6 @@ type DataContextType = {
   removeResource: (id: string) => void;
   removeScalingEvent: (id: string) => void;
   setAlerts: React.Dispatch<React.SetStateAction<AlertType[]>>;
-  setResources: React.Dispatch<React.SetStateAction<typeof initialResources>>;
-  adjustResourceCpu: (resourceId: string, value: number, isDelta?: boolean) => void;
 };
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -341,22 +339,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const removeResource = (id: string) => setResources((prev) => prev.filter(r => r.id !== id));
   const removeScalingEvent = (id: string) => setScalingEvents((prev) => prev.filter(e => e.id !== id));
 
-  const adjustResourceCpu = (resourceId: string, value: number, isDelta: boolean = false) => {
-    setResources((prev) =>
-      prev.map((res) => {
-        if (res.id === resourceId || res.cloudProvider === "aws" || resourceId === "all") {
-          const newCpu = Math.max(5, Math.min(100, isDelta ? res.cpuUsage + value : value));
-          let status = res.status;
-          if (newCpu >= 90) status = "critical";
-          else if (newCpu >= 75) status = "warning";
-          else status = "healthy";
-          return { ...res, cpuUsage: newCpu, status };
-        }
-        return res;
-      })
-    );
-  };
-
   return (
     <DataContext.Provider
       value={{
@@ -386,8 +368,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         removeResource,
         removeScalingEvent,
         setAlerts,
-        setResources,
-        adjustResourceCpu,
       }}
     >
       {children}
